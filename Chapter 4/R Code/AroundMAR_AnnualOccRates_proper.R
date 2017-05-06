@@ -21,8 +21,6 @@ library(RColorBrewer)
 library(MuMIn) # for QIC
 
 
-
-
 OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
