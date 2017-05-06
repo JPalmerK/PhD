@@ -243,6 +243,13 @@ ModelTable$Nunits2013= 0
 ModelTable$Nunits2014= 0
 ModelTable$Nunits2015= 0
 
+big_mod=mod=geeglm(OccAll~ShoreDist*bs(JulienDay)+Year+ShoreDist, 
+                   corstr = 'ar1',
+                   offset = BNDTotOffset, 
+                   family = binomial, 
+                   data   = OccTable_daily_wDetections,
+                   id=UnitLoc)
+
 
 
 for(ii in 1:10){
