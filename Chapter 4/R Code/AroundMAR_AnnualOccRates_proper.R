@@ -218,7 +218,19 @@ rm(temp1, temp2, temp3, temp4,temp5,temp6, temp7, temp8)
 colnames(Basic_table)=c('UnitLoc', 'NDetections2013', 'NDays2013', 'PropOccupied2013'
                         , 'NDetections2014', 'NDays2014', 'PropOccupied2014'
                         , 'NDetections2015', 'NDays2015', 'PropOccupied2015')
+Basic_table[is.na(Basic_table)]=0
 
+library(binom)
+Basic_table$BinConf2013L=binconf(x=Basic_table$NDetections2013, n = Basic_table$NDays2013)[,2]
+Basic_table$BinConf2014L=binconf(x=Basic_table$NDetections2014, n = Basic_table$NDays2014)[,2]
+Basic_table$BinConf2015L=binconf(x=Basic_table$NDetections2015, n = Basic_table$NDays2015)[,2]
+
+Basic_table$BinConf2013U=binconf(x=Basic_table$NDetections2013, n = Basic_table$NDays2013)[,3]
+Basic_table$BinConf2014U=binconf(x=Basic_table$NDetections2014, n = Basic_table$NDays2014)[,3]
+Basic_table$BinConf2015U=binconf(x=Basic_table$NDetections2015, n = Basic_table$NDays2015)[,3]
+
+
+  
 # write.csv(Basic_table, 'W:/KJP PHD/4-Bayesian Habitat Use/Figures/Basic Ocuppancy 2013-2015.csv')
 
 #################################################################################
@@ -243,7 +255,9 @@ ModelTable$Data2015='none'
 ModelTable$Nunits2013= 0
 ModelTable$Nunits2014= 0
 ModelTable$Nunits2015= 0
+ModelTable$CorrStuct='none'
 
+# list to store the models
 # list to store the models
 modlist=list()
 
@@ -256,8 +270,13 @@ for(ii in 1:10){
   ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
   ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
   ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
- 
+  
   newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
+  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
+                              OccAll=0,
+                              ShoreDist=unique(newdat$ShoreDist),
+                              GroupId=unique(newdat$GroupId),
+                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
   
   
   tryCatch({
@@ -270,159 +289,86 @@ for(ii in 1:10){
   tryCatch({
     ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
   
-  # if(sum(duplicated(temp$UnitLoc))>1){
-  if(ii==5){
-    mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
-               corstr = 'ar1', 
-               offset = BNDTotOffset, 
-               family = binomial, 
-               id     = UnitLoc, 
-               data   = data_sub)
-    
-    mod2=geeglm(OccAll~bs(JulienDay), 
-                         corstr = 'ar1', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub)
-    mod3=geeglm(OccAll~ShoreDist, 
-                         corstr = 'ar1', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub)
- 
-    
-
-    
-    
-
-    Qicdf=data.frame(QIC(mod1, mod2, mod3))
-    Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All', 'ShoreDist' ,'bs(JulienDay)')
-    Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-    
-    gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-                              Qicdf$Varnames[2]))
-
-    
-  modlist[[ii]]=geeglm(formula=gee_form, 
-                         corstr = 'ar1', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub)
-        
-    }else if(ii==7){
-    mod1=geeglm(OccAll~ShoreDist*bs(JulienDay)+Year+ShoreDist, 
-          corstr = 'ar1',
-          offset = BNDTotOffset, 
-          family = binomial, 
-          data   = data_sub,
-          id=UnitLoc)
-    
-    mod2=geeglm(OccAll~ShoreDist*bs(JulienDay)+Year, 
-                corstr = 'ar1',
-                offset = BNDTotOffset, 
-                family = binomial, 
-                data   = data_sub,
-                id=UnitLoc)
-    mod3=geeglm(OccAll~ShoreDist*bs(JulienDay)+ShoreDist, 
-                 corstr = 'ar1',
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 data   = data_sub,
-                 id=UnitLoc)
-    mod4=geeglm(OccAll~Year+ShoreDist, 
-                 corstr = 'ar1',
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 data   = data_sub,
-                 id=UnitLoc)
-    
-    
-    
-    Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
-    Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All',  'ShoreDist', 'Year' ,'ShoreDist*bs(JulienDay)')
-    Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-    
-    gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-                              Qicdf$Varnames[2], '+',
-                              Qicdf$Varnames[4]))
-    
-    modlist[[ii]]=geeglm(formula=gee_form, 
-                         corstr = 'ar1', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub)
-    
-    }else{
   
-# At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
-# (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-    mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist+Year, 
-       corstr = 'ar1', 
-       offset = BNDTotOffset, 
-       family = binomial, 
-       id     = UnitLoc, 
-       data   = data_sub) 
-    
-
-
-    mod2=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)   
-    mod3=geeglm(OccAll~bs(JulienDay)+Year, 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    mod4=geeglm(OccAll~ShoreDist+Year, 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    
-    Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
-    Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay)')
-    Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-    
-    gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-                                         Qicdf$Varnames[2], '+',
-                                         Qicdf$Varnames[3]))
-    
+  
+  # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
+  # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
+  mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist+Year, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  
+  
+  mod2=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub)   
+  mod3=geeglm(OccAll~bs(JulienDay)+Year, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub)
+  mod4=geeglm(OccAll~ShoreDist+Year, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub)
+  
+  Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
+  Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
+  Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay)')
+  Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
+  
+  gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
+                            Qicdf$Varnames[2], '+',
+                            Qicdf$Varnames[3]))
+  if(ii==6 |ii==5|ii==7){
+    modlist[[ii]]=geeglm(formula = gee_form, 
+                         corstr = 'independence', 
+                         offset = BNDTotOffset, 
+                         family = binomial, 
+                         id     = UnitLoc, 
+                         data   = data_sub) 
+  }else{
     modlist[[ii]]=geeglm(formula = gee_form, 
                          corstr = 'ar1', 
                          offset = BNDTotOffset, 
                          family = binomial, 
                          id     = UnitLoc, 
-                         data   = data_sub) 
-
-    }
+                         data   = data_sub)}
   
-  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
-  
-  if(ii==1){
-    fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-  }else {
-    fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-  }
-  
-  rm(mod1,mod2, mod3, mod4, Qicdf)
 }
+
+ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
+
+if(ii==1){
+  fit=cbind(newdat,  predictvcv(modlist[[ii]]))
+  dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+}else {
+  fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
+  dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+}
+
+rm(mod1,mod2, mod3, mod4, Qicdf)
+
+ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
+}
+
+
 mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
 mm$UnitLoc=paste(mm$GroupId, mm$ShoreDist, sep="_")
 mm_nocro=mm[mm$UnitLoc != 'Cro_05',]
 
 fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
+
+dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
 
 
 
@@ -430,7 +376,7 @@ fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 # Plot all the data
-ggplot(data=fit) +
+ggplot(data=dummyfit) +
   theme_bw() +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
@@ -443,8 +389,8 @@ ggplot(data=fit) +
 
 
 # Plot the data without Cromarty 05
-
-ggplot(data=fit[fit$UnitLoc != 'Cro_05',]) +
+dummyfit$UnitLoc=paste(dummyfit$GroupId, dummyfit$ShoreDist, sep = '_')
+ggplot(data=dummyfit[dummyfit$UnitLoc != 'Cro_05',]) +
   theme_bw() +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
@@ -453,8 +399,6 @@ ggplot(data=fit[fit$UnitLoc != 'Cro_05',]) +
                                                   color=ShoreDist), size=.9) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
               alpha=.2,linetype= 'blank') 
-
-
 
 
 
@@ -487,9 +431,7 @@ for(ii in 1:10){
   # Julien Date Smoothes #
   #######################################################
   # Get the smoothed index terms 
-  if(ii==7){
-    BS_idx=c(2:4)
-  }else{BS_idx=which(grepl("bs", colnames(BootstrapParameters)))}
+  BS_idx=which(grepl("bs", colnames(BootstrapParameters)))
   
   
   
@@ -522,14 +464,15 @@ for(ii in 1:10){
             geom_line(aes(x=DummyDate, y=y)) +
             geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI), alpha=.3) +
             geom_rug(data=subset(data_sub, OccAll==1), 
-                   aes(x=DummyDate, y=OccAll*.3, colour= ShoreDist),
+                   aes(x=DummyDate, y=OccAll*.3),
                    sides='t', alpha=.8) +
             geom_rug(data=subset(data_sub, OccAll==0), 
-                   aes(x=DummyDate, y=OccAll, colour= ShoreDist),
+                   aes(x=DummyDate, y=OccAll),
                    sides='b', alpha=.8) +
              xlab('Julien Day') +
              ylab('Detection Probability') +
-            ggtitle(paste('Partial Plot of Julien Day ', as.character(unique(data_sub$GroupId))))
+            theme_minimal() +
+            ggtitle(paste('Partial Plot of Julien Day', as.character(unique(data_sub$GroupId))))
 
 
   #######################################################
@@ -566,8 +509,9 @@ for(ii in 1:10){
     
     
     Sd_P[[ii]]=ggplot(BootstrapCoefs2_invlogit, aes(x=ShoreDist, y=vals)) + 
-    geom_boxplot() + 
-    ggtitle(paste('Partial Plot of ShoreDist ', as.character(unique(data_sub$GroupId))))}
+      geom_boxplot() + 
+      theme_minimal() +
+      ggtitle(paste('Partial Plot of ShoreDist', as.character(unique(data_sub$GroupId))))}
 
  
   #######################################################
@@ -604,15 +548,11 @@ for(ii in 1:10){
     
     
     Yr_P[[ii]]=ggplot(BootstrapCoefs2_invlogit, aes(x=Year, y=vals)) + 
-      geom_boxplot() + 
-      ggtitle(paste('Partial Plot of Years '))}
+      geom_boxplot() +
+      theme_minimal()+
+      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))}
   
-    
-    
-    
 
-  
-  
   
     rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
     
