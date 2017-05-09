@@ -344,9 +344,8 @@ for(ii in 1:10){
                          id     = UnitLoc, 
                          data   = data_sub)}
   
-}
 
-ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
+
 
 if(ii==1){
   fit=cbind(newdat,  predictvcv(modlist[[ii]]))
@@ -356,9 +355,10 @@ if(ii==1){
   dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
 }
 
-rm(mod1,mod2, mod3, mod4, Qicdf)
 
+ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
 ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
+rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
 
@@ -375,17 +375,20 @@ dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
 # colorblind palette with black:
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
+temp=dummyfit[!duplicated(dummyfit$GroupId),]
+
 # Plot all the data
 ggplot(data=dummyfit) +
   theme_bw() +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
   geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
+  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
   geom_point(data=mm, aes(x=DummyDate, y=BBOcc,
                           color=ShoreDist), size=.9) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
               alpha=.2,linetype= 'blank') 
-
+  
 
 
 # Plot the data without Cromarty 05
