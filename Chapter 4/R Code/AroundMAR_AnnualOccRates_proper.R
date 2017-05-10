@@ -263,7 +263,9 @@ modlist=list()
 
 for(ii in 1:10){
   data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
   data_sub <- droplevels(data_sub)
+  
   
   
   
@@ -384,11 +386,12 @@ ggplot(data=dummyfit) +
   scale_colour_manual(values=cbbPalette) +
   geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
   annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
-  geom_point(data=mm, aes(x=DummyDate, y=BBOcc,
-                          color=ShoreDist), size=.9) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank') 
-  
+              alpha=.2,linetype= 'blank') +
+  geom_point(data=mm, aes(x=DummyDate, y=BBOcc,
+                          color=ShoreDist), size=.9) 
+
+
 
 
 # Plot the data without Cromarty 05
@@ -398,10 +401,10 @@ ggplot(data=dummyfit[dummyfit$UnitLoc != 'Cro_05',]) +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
   geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
-  geom_point(data=mm[mm$UnitLoc !='Cro_05',], aes(x=DummyDate, y=BBOcc,
-                                                  color=ShoreDist), size=.9) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank') 
+              alpha=.2,linetype= 'blank') +
+  geom_point(data=mm[mm$UnitLoc !='Cro_05',], aes(x=DummyDate, y=BBOcc,
+                                                  color=ShoreDist), size=.9) 
 
 
 
@@ -414,9 +417,14 @@ p=list()
 Sd_P=list()
 Yr_P=list()
 
+# in the model coeficients there is not 2013 or 05 shroe distance
 for(ii in 1:10){
   
   data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+  data_sub <- droplevels(data_sub)
+  
+  
   data_sub$DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01"))
   mod=modlist[[ii]]
   
@@ -458,12 +466,12 @@ for(ii in 1:10){
   ciu1<-cis[2,]-mean(x1)-coef(mod)[1]
 
   
-  fitdf=data.frame(x=JdateForPlotting, y=inv.logit(RealFitCenter1), LCI=inv.logit(cil1), UCI=inv.logit(ciu1))  
-  fitdf$DummyDate=as.Date(JdateForPlotting, origin=as.Date("2013-01-01"))
+  fitdf_jdate=data.frame(x=JdateForPlotting, y=inv.logit(RealFitCenter1), LCI=inv.logit(cil1), UCI=inv.logit(ciu1))  
+  fitdf_jdate$DummyDate=as.Date(JdateForPlotting, origin=as.Date("2013-01-01"))
   
 
   
-  p[[ii]]=ggplot(data=fitdf) + 
+  p[[ii]]=ggplot(data=fitdf_jdate) + 
             geom_line(aes(x=DummyDate, y=y)) +
             geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI), alpha=.3) +
             geom_rug(data=subset(data_sub, OccAll==1), 
@@ -481,9 +489,10 @@ for(ii in 1:10){
   #######################################################
   # Shore Dist Factors #
   #######################################################
+  
   SD_idx=which(grepl("Shore", colnames(BootstrapParameters)))
-  if(length(SD_idx)>1){
-  x2<-model.matrix(test)[,SD_idx]%*%coef(mod)[SD_idx]
+
+  x2<-model.matrix(test)[,c(1,SD_idx)]%*%coef(mod)[c(1,SD_idx)]
   
   BootstrapCoefs2<- BootstrapParameters[,c(1, SD_idx)]
   RealFit<- coef(mod)[c(1, SD_idx)]
@@ -503,27 +512,36 @@ for(ii in 1:10){
   fitdf=data.frame(x=ShoreDistForPlotting, y=inv.logit(RealFitCenter1), 
                    LCI=inv.logit(cil1), UCI=inv.logit(ciu1),
                    lsd=inv.logit(sd1), usd=inv.logit(sd2))  
+
+ # BootstrapCoefs2=apply(BootstrapCoefs2, 2, inv.logit)
+  BootstrapCoefs2_invlogit=data.frame(vals=BootstrapCoefs2[,1])
+  #BootstrapCoefs2_invlogit$ShoreDist=as.character(unique(data_sub$ShoreDist)[1])
+  BootstrapCoefs2_invlogit$ShoreDist='05'
   
-    BootstrapCoefs2_invlogit=data.frame(vals=inv.logit(c(BootstrapCoefs2[,1],
-                                               BootstrapCoefs2[,2],
-                                               BootstrapCoefs2[,3])))
-    
-    BootstrapCoefs2_invlogit$ShoreDist=as.character(sort(rep(c(5,10,15), length.out=nrow(BootstrapCoefs2_invlogit))))
+  # Recompile for plotting
+  for(jj in 2:ncol(BootstrapCoefs2)){
+    temp=data.frame(vals=BootstrapCoefs2[,jj])
+    temp$ShoreDist=substr(colnames(BootstrapCoefs2)[jj], 10,11)
+    BootstrapCoefs2_invlogit=rbind(BootstrapCoefs2_invlogit, temp)
+    rm(temp)
+  }
+  
+  #BootstrapCoefs2_invlogit$ShoreDist=as.character(sort(rep(c(5,10,15), length.out=nrow(BootstrapCoefs2_invlogit))))
     
     
     Sd_P[[ii]]=ggplot(BootstrapCoefs2_invlogit, aes(x=ShoreDist, y=vals)) + 
       geom_boxplot() + 
       theme_minimal() +
-      ggtitle(paste('Partial Plot of ShoreDist', as.character(unique(data_sub$GroupId))))}
+      ggtitle(paste('Partial Plot of ShoreDist', as.character(unique(data_sub$GroupId))))
 
  
   #######################################################
   # Year as Factors #
   #######################################################
   Yr_idx=which(grepl("Year", colnames(BootstrapParameters)))
-  
-  if(length(Yr_idx)>1){
-    x2<-model.matrix(test)[,Yr_idx]%*%coef(mod)[Yr_idx]
+    
+    x2<-model.matrix(test)[,c(1,Yr_idx)]%*%coef(mod)[c(1,Yr_idx)]
+    
     BootstrapCoefs2<- BootstrapParameters[,c(1, Yr_idx)]
     RealFit<- coef(mod)[c(1, Yr_idx)]
     RealFitCenter1<- RealFit-mean(x2)-coef(mod)[1]
@@ -543,25 +561,88 @@ for(ii in 1:10){
                      LCI=inv.logit(cil1), UCI=inv.logit(ciu1),
                      lsd=inv.logit(sd1), usd=inv.logit(sd2))  
     
-    BootstrapCoefs2_invlogit=data.frame(vals=inv.logit(c(BootstrapCoefs2[,1],
-                                                         BootstrapCoefs2[,2],
-                                                         BootstrapCoefs2[,3])))
+    #BootstrapCoefs3=apply(BootstrapCoefs3, 2, inv.logit)
+    BootstrapCoefs3_invlogit=data.frame(vals=BootstrapCoefs3[,1])
+    BootstrapCoefs3_invlogit$Year=unique(data_sub$Year)[1]
     
-    BootstrapCoefs2_invlogit$Year=as.character(sort(rep(YearsForPlotting, length.out=nrow(BootstrapCoefs2_invlogit))))
+    # Recompile for plotting
+    for(jj in 2:ncol(BootstrapCoefs2)){
+      temp=data.frame(vals=BootstrapCoefs3[,jj])
+      temp$Year=substr(colnames(BootstrapCoefs3)[jj], 5,8)
+      BootstrapCoefs3_invlogit=rbind(BootstrapCoefs3_invlogit, temp)
+      rm(temp)
+    }
     
-    
-    Yr_P[[ii]]=ggplot(BootstrapCoefs2_invlogit, aes(x=Year, y=vals)) + 
+    Yr_P[[ii]]=ggplot(BootstrapCoefs3_invlogit, aes(x=Year, y=vals)) + 
       geom_boxplot() +
       theme_minimal()+
-      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))}
+      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
   
 
-  
-    rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
     
+    # Add all data for plotting
+    fitdf_jdate$GroupId=data_sub$GroupId[1]
+    BootstrapCoefs2_invlogit$GroupId=data_sub$GroupId[1] # shore dist
+    BootstrapCoefs3_invlogit$GroupId=data_sub$GroupId[1]
+    if(ii==1){
+      fitdf_jdate_out=fitdf_jdate
+      fitdf_shoredist_out=BootstrapCoefs2_invlogit
+      fitdf_Year_out=BootstrapCoefs3_invlogit
+      
+    }else {
+      fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
+      fitdf_shoredist_out=rbind(fitdf_shoredist_out, BootstrapCoefs2_invlogit)
+      fitdf_Year_out=rbind(fitdf_Year_out, BootstrapCoefs3_invlogit)
+    }
+     rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
+       
 }
 
 
+# Visualise partial plots with data
+
+
+mm=data.frame(aggregate(data=OccTable_daily, BBOcc~DayBin+GroupId, FUN=mean))
+mm$med=aggregate(data=OccTable_daily, JulienDay~DayBin+GroupId, FUN=median)[,3]
+mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
+OccTable_daily$DummyDate=as.Date(OccTable_daily$JulienDay, origin=as.Date("2013-01-01"))
+
+
+ggplot(data=fitdf_jdate_out) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_line(aes(DummyDate, y), size=1) +
+  geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI),
+              alpha=.2,linetype= 'blank') +
+  geom_rug(data=subset(OccTable_daily, OccAll==1), 
+           aes(x=DummyDate, y=OccAll*.3),
+           sides='t', alpha=.8) +
+  geom_rug(data=subset(OccTable_daily, OccAll==0), 
+           aes(x=DummyDate, y=OccAll),
+           sides='b', alpha=.8) 
+
+ggplot(data=fitdf_shoredist_out) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  geom_boxplot(aes(x=ShoreDist, y=vals))
+
+ggplot(data=fitdf_Year_out) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  geom_boxplot(aes(x=Year, y=vals))
+
+
+  scale_colour_manual(values=cbbPalette) +
+  geom_line(aes(DummyDate, y), size=1) +
+  geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI),
+              alpha=.2,linetype= 'blank') +
+  geom_rug(data=subset(OccTable_daily, OccAll==1), 
+           aes(x=DummyDate, y=OccAll*.3),
+           sides='t', alpha=.8) +
+  geom_rug(data=subset(OccTable_daily, OccAll==0), 
+           aes(x=DummyDate, y=OccAll),
+           sides='b', alpha=.8) 
 
 
 ####################################
@@ -830,6 +911,7 @@ fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
 mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
 mm$UnitLoc=paste(mm$GroupId, mm$ShoreDist, sep="_")
 mm_nocro=mm[mm$UnitLoc != 'Cro_05',]
+mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
 
 
 ggplot(data=fit) +
