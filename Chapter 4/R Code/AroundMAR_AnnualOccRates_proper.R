@@ -542,14 +542,14 @@ for(ii in 1:10){
     
     x2<-model.matrix(test)[,c(1,Yr_idx)]%*%coef(mod)[c(1,Yr_idx)]
     
-    BootstrapCoefs2<- BootstrapParameters[,c(1, Yr_idx)]
+    BootstrapCoefs3<- BootstrapParameters[,c(1, Yr_idx)]
     RealFit<- coef(mod)[c(1, Yr_idx)]
     RealFitCenter1<- RealFit-mean(x2)-coef(mod)[1]
-    SDs=apply(BootstrapCoefs2, 2, sd)
+    SDs=apply(BootstrapCoefs3, 2, sd)
     sd1=RealFitCenter1-SDs
     sd2=RealFitCenter1+SDs
     
-    cis=apply(BootstrapCoefs2, 2, quant.func)
+    cis=apply(BootstrapCoefs3, 2, quant.func)
     
     MinimumYlim1<- min(cis-mean(x2)-coef(mod)[1])
     MaximumYlim1<- max(cis-mean(x2)-coef(mod)[1])
@@ -566,7 +566,7 @@ for(ii in 1:10){
     BootstrapCoefs3_invlogit$Year=unique(data_sub$Year)[1]
     
     # Recompile for plotting
-    for(jj in 2:ncol(BootstrapCoefs2)){
+    for(jj in 2:ncol(BootstrapCoefs3)){
       temp=data.frame(vals=BootstrapCoefs3[,jj])
       temp$Year=substr(colnames(BootstrapCoefs3)[jj], 5,8)
       BootstrapCoefs3_invlogit=rbind(BootstrapCoefs3_invlogit, temp)
