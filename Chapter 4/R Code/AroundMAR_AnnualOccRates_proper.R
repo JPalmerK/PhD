@@ -233,6 +233,60 @@ Basic_table$BinConf2015U=binconf(x=Basic_table$NDetections2015, n = Basic_table$
   
 # write.csv(Basic_table, 'W:/KJP PHD/4-Bayesian Habitat Use/Figures/Basic Ocuppancy 2013-2015.csv')
 
+##################################################################################
+# Basic Table for BND Trains #
+##################################################################################
+
+Basic_table_bb=aggregate(data=subset(OccTable_daily, Year==2013), BBOcc~UnitLoc, FUN=sum)
+temp1=aggregate(data=subset(OccTable_daily, Year==2014), BBOcc~UnitLoc, FUN=sum)
+temp2=aggregate(data=subset(OccTable_daily, Year==2015), BBOcc~UnitLoc, FUN=sum)
+
+temp3=aggregate(data=subset(OccTable_daily, Year==2013), Date~UnitLoc, FUN=length)
+temp4=aggregate(data=subset(OccTable_daily, Year==2014), Date~UnitLoc, FUN=length)
+temp5=aggregate(data=subset(OccTable_daily, Year==2015), Date~UnitLoc, FUN=length)
+
+
+temp6=aggregate(data=subset(OccTable_daily, Year==2013), BBOcc~UnitLoc, FUN=mean)
+temp7=aggregate(data=subset(OccTable_daily, Year==2014), BBOcc~UnitLoc, FUN=mean)
+temp8=aggregate(data=subset(OccTable_daily, Year==2015), BBOcc~UnitLoc, FUN=mean)
+
+
+Basic_table_bb=merge(Basic_table_bb, temp1, all = TRUE, by='UnitLoc')
+Basic_table_bb=merge(Basic_table_bb, temp2, all = TRUE, by='UnitLoc')
+
+Basic_table_bb=merge(Basic_table_bb, temp3, all = TRUE, by='UnitLoc')
+Basic_table_bb=merge(Basic_table_bb, temp4, all = TRUE, by='UnitLoc')
+Basic_table_bb=merge(Basic_table_bb, temp5, all = TRUE, by='UnitLoc')
+
+Basic_table_bb=merge(Basic_table_bb, temp6, all = TRUE, by='UnitLoc')
+Basic_table_bb=merge(Basic_table_bb, temp7, all = TRUE, by='UnitLoc')
+Basic_table_bb=merge(Basic_table_bb, temp8, all = TRUE, by='UnitLoc')
+
+# Reorder
+
+Basic_table_bb=Basic_table_bb[, c(1,2,5,8, 3,6,9, 4,7,10)]
+
+rm(temp1, temp2, temp3, temp4,temp5,temp6, temp7, temp8)
+
+colnames(Basic_table_bb)=c('UnitLoc', 'NDetections2013', 'NDays2013', 'PropOccupied2013'
+                        , 'NDetections2014', 'NDays2014', 'PropOccupied2014'
+                        , 'NDetections2015', 'NDays2015', 'PropOccupied2015')
+Basic_table_bb[is.na(Basic_table_bb)]=0
+
+library(binom)
+Basic_table_bb$BinConf2013L=binconf(x=Basic_table_bb$NDetections2013, n = Basic_table_bb$NDays2013)[,2]
+Basic_table_bb$BinConf2014L=binconf(x=Basic_table_bb$NDetections2014, n = Basic_table_bb$NDays2014)[,2]
+Basic_table_bb$BinConf2015L=binconf(x=Basic_table_bb$NDetections2015, n = Basic_table_bb$NDays2015)[,2]
+
+Basic_table_bb$BinConf2013U=binconf(x=Basic_table_bb$NDetections2013, n = Basic_table_bb$NDays2013)[,3]
+Basic_table_bb$BinConf2014U=binconf(x=Basic_table_bb$NDetections2014, n = Basic_table_bb$NDays2014)[,3]
+Basic_table_bb$BinConf2015U=binconf(x=Basic_table_bb$NDetections2015, n = Basic_table_bb$NDays2015)[,3]
+
+
+
+
+
+
 #################################################################################
 # Different Spline for all Locs #
 #################################################################################
@@ -448,7 +502,6 @@ for(ii in 1:10){
   
   test<- glm(formula(mod),family=binomial, data=data_sub)
   x1<-model.matrix(test)[,BS_idx]%*%coef(mod)[BS_idx]
-
   
   
   BootstrapCoefs<- BootstrapParameters[,c(1, BS_idx)]
@@ -464,138 +517,142 @@ for(ii in 1:10){
   MaximumYlim1<- max(cis-mean(x1)-coef(mod)[1])
   cil1<-cis[1,]-mean(x1)-coef(mod)[1]
   ciu1<-cis[2,]-mean(x1)-coef(mod)[1]
-
+  
   
   fitdf_jdate=data.frame(x=JdateForPlotting, y=inv.logit(RealFitCenter1), LCI=inv.logit(cil1), UCI=inv.logit(ciu1))  
   fitdf_jdate$DummyDate=as.Date(JdateForPlotting, origin=as.Date("2013-01-01"))
   
-
+  
   
   p[[ii]]=ggplot(data=fitdf_jdate) + 
-            geom_line(aes(x=DummyDate, y=y)) +
-            geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI), alpha=.3) +
-            geom_rug(data=subset(data_sub, OccAll==1), 
-                   aes(x=DummyDate, y=OccAll*.3),
-                   sides='t', alpha=.8) +
-            geom_rug(data=subset(data_sub, OccAll==0), 
-                   aes(x=DummyDate, y=OccAll),
-                   sides='b', alpha=.8) +
-             xlab('Julien Day') +
-             ylab('Detection Probability') +
-            theme_minimal() +
-            ggtitle(paste('Partial Plot of Julien Day', as.character(unique(data_sub$GroupId))))
-
-
+    geom_line(aes(x=DummyDate, y=y)) +
+    geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI), alpha=.3) +
+    geom_rug(data=subset(data_sub, OccAll==1), 
+             aes(x=DummyDate, y=OccAll*.3),
+             sides='t', alpha=.8) +
+    geom_rug(data=subset(data_sub, OccAll==0), 
+             aes(x=DummyDate, y=OccAll),
+             sides='b', alpha=.8) +
+    xlab('Julien Day') +
+    ylab('Detection Probability') +
+    theme_minimal() +
+    ggtitle(paste('Partial Plot of Julien Day', as.character(unique(data_sub$GroupId))))
+  
+  
   #######################################################
   # Shore Dist Factors #
   #######################################################
   
   SD_idx=which(grepl("Shore", colnames(BootstrapParameters)))
-
-  x2<-model.matrix(test)[,c(1,SD_idx)]%*%coef(mod)[c(1,SD_idx)]
   
-  BootstrapCoefs2<- BootstrapParameters[,c(1, SD_idx)]
-  RealFit<- coef(mod)[c(1, SD_idx)]
-  RealFitCenter1<- RealFit-mean(x2)-coef(mod)[1]
-  SDs=apply(BootstrapCoefs2, 2, sd)
-  sd1=RealFitCenter1-SDs
-  sd2=RealFitCenter1+SDs
-  
-  cis=apply(BootstrapCoefs2, 2, quant.func)
-
-  MinimumYlim1<- min(cis-mean(x2)-coef(mod)[1])
-  MaximumYlim1<- max(cis-mean(x2)-coef(mod)[1])
-  cil1<-cis[1,]-mean(x2)-coef(mod)[1]
-  ciu1<-cis[2,]-mean(x2)-coef(mod)[1]
-
-  
-  fitdf=data.frame(x=ShoreDistForPlotting, y=inv.logit(RealFitCenter1), 
-                   LCI=inv.logit(cil1), UCI=inv.logit(ciu1),
-                   lsd=inv.logit(sd1), usd=inv.logit(sd2))  
-
- # BootstrapCoefs2=apply(BootstrapCoefs2, 2, inv.logit)
-  BootstrapCoefs2_invlogit=data.frame(vals=BootstrapCoefs2[,1])
-  #BootstrapCoefs2_invlogit$ShoreDist=as.character(unique(data_sub$ShoreDist)[1])
-  BootstrapCoefs2_invlogit$ShoreDist='05'
-  
-  # Recompile for plotting
-  for(jj in 2:ncol(BootstrapCoefs2)){
-    temp=data.frame(vals=BootstrapCoefs2[,jj])
-    temp$ShoreDist=substr(colnames(BootstrapCoefs2)[jj], 10,11)
-    BootstrapCoefs2_invlogit=rbind(BootstrapCoefs2_invlogit, temp)
-    rm(temp)
+  coeffac <- c(grep("ShoreDist", colnames(model.matrix(mod))))
+  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
+  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
+  xvals <- data_sub[, which(names(data_sub) == "ShoreDist")]
+  newX <- sort(unique(xvals))
+  newX <- newX[2:length(newX)]
+  partialfit <- coef(mod)[c(coefpos)]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
   }
   
-  #BootstrapCoefs2_invlogit$ShoreDist=as.character(sort(rep(c(5,10,15), length.out=nrow(BootstrapCoefs2_invlogit))))
+  
+  if(length(SD_idx)>1){
     
+    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
+    BootstrapCoefs2=data.frame(vals=rpreds[,1])
+    BootstrapCoefs2$ShoreDist=colnames(rpreds)[1]
     
-    Sd_P[[ii]]=ggplot(BootstrapCoefs2_invlogit, aes(x=ShoreDist, y=vals)) + 
-      geom_boxplot() + 
-      theme_minimal() +
-      ggtitle(paste('Partial Plot of ShoreDist', as.character(unique(data_sub$GroupId))))
-
- 
+    # Recompile for plotting
+    for(jj in 2:ncol(BootstrapCoefs2)){
+      temp=data.frame(vals=rpreds[,jj])
+      temp$ShoreDist=colnames(rpreds)[jj]
+      BootstrapCoefs2=rbind(BootstrapCoefs2, temp)
+      rm(temp)
+    }
+    
+  }else{
+    
+    rpreds <- rcoefs[,coefpos]
+    BootstrapCoefs2=data.frame(vals=rpreds)
+    BootstrapCoefs2$ShoreDist=colnames(BootstrapParameters)[SD_idx]
+  }
+  BootstrapCoefs2$GroupId=unique(data_sub$GroupId)
+  
   #######################################################
   # Year as Factors #
   #######################################################
   Yr_idx=which(grepl("Year", colnames(BootstrapParameters)))
+  
+  
+  coeffac <- c(grep("Year", colnames(model.matrix(mod))))
+  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
+  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
+  xvals <- data_sub[, which(names(data_sub) == "Year")]
+  newX <- sort(unique(xvals))
+  newX <- newX[2:length(newX)]
+  partialfit <- coef(mod)[c(coefpos)]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
+  }
+  
+  
+  if(length(Yr_idx)>1){
     
-    x2<-model.matrix(test)[,c(1,Yr_idx)]%*%coef(mod)[c(1,Yr_idx)]
+    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
+    BootstrapCoefs3=data.frame(vals=rpreds[,1])
+    BootstrapCoefs3$Year=colnames(rpreds)[1]
     
-    BootstrapCoefs3<- BootstrapParameters[,c(1, Yr_idx)]
-    RealFit<- coef(mod)[c(1, Yr_idx)]
-    RealFitCenter1<- RealFit-mean(x2)-coef(mod)[1]
-    SDs=apply(BootstrapCoefs3, 2, sd)
-    sd1=RealFitCenter1-SDs
-    sd2=RealFitCenter1+SDs
-    
-    cis=apply(BootstrapCoefs3, 2, quant.func)
-    
-    MinimumYlim1<- min(cis-mean(x2)-coef(mod)[1])
-    MaximumYlim1<- max(cis-mean(x2)-coef(mod)[1])
-    cil1<-cis[1,]-mean(x2)-coef(mod)[1]
-    ciu1<-cis[2,]-mean(x2)-coef(mod)[1]
+    ############################
+    # Recompile for plotting #
+    #############################
     
     
-    fitdf=data.frame(x=YearsForPlotting, y=inv.logit(RealFitCenter1), 
-                     LCI=inv.logit(cil1), UCI=inv.logit(ciu1),
-                     lsd=inv.logit(sd1), usd=inv.logit(sd2))  
-    
-    #BootstrapCoefs3=apply(BootstrapCoefs3, 2, inv.logit)
-    BootstrapCoefs3_invlogit=data.frame(vals=BootstrapCoefs3[,1])
-    BootstrapCoefs3_invlogit$Year=unique(data_sub$Year)[1]
-    
-    # Recompile for plotting
     for(jj in 2:ncol(BootstrapCoefs3)){
-      temp=data.frame(vals=BootstrapCoefs3[,jj])
-      temp$Year=substr(colnames(BootstrapCoefs3)[jj], 5,8)
-      BootstrapCoefs3_invlogit=rbind(BootstrapCoefs3_invlogit, temp)
+      temp=data.frame(vals=rpreds[,jj])
+      temp$Year=colnames(rpreds)[jj]
+      BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
       rm(temp)
     }
     
-    Yr_P[[ii]]=ggplot(BootstrapCoefs3_invlogit, aes(x=Year, y=vals)) + 
-      geom_boxplot() +
-      theme_minimal()+
-      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
-  
-
+  }else{
     
-    # Add all data for plotting
-    fitdf_jdate$GroupId=data_sub$GroupId[1]
-    BootstrapCoefs2_invlogit$GroupId=data_sub$GroupId[1] # shore dist
-    BootstrapCoefs3_invlogit$GroupId=data_sub$GroupId[1]
-    if(ii==1){
-      fitdf_jdate_out=fitdf_jdate
-      fitdf_shoredist_out=BootstrapCoefs2_invlogit
-      fitdf_Year_out=BootstrapCoefs3_invlogit
-      
-    }else {
-      fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
-      fitdf_shoredist_out=rbind(fitdf_shoredist_out, BootstrapCoefs2_invlogit)
-      fitdf_Year_out=rbind(fitdf_Year_out, BootstrapCoefs3_invlogit)
-    }
-     rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
-       
+    rpreds <- rcoefs[,coefpos]
+    BootstrapCoefs3=data.frame(vals=rpreds)
+    BootstrapCoefs3$Year=colnames(model.matrix(mod))[Yr_idx]
+  }
+  
+  BootstrapCoefs3$GroupId=unique(data_sub$GroupId)
+  
+  # Yr_P[[ii]]=ggplot(BootstrapCoefs3_invlogit, aes(x=Year, y=vals)) + 
+  #   geom_boxplot() +
+  #   theme_minimal()+
+  #   ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
+  
+  
+  
+  # Add all data for plotting
+  fitdf_jdate$GroupId=data_sub$GroupId[1]
+  
+  
+  if(ii==1){
+    fitdf_jdate_out=fitdf_jdate
+    fitdf_shoredist_out=BootstrapCoefs2
+    fitdf_Year_out=BootstrapCoefs3
+    
+  }else {
+    fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
+    fitdf_shoredist_out=rbind(fitdf_shoredist_out, BootstrapCoefs2)
+    fitdf_Year_out=rbind(fitdf_Year_out, BootstrapCoefs3)
+  }
+  rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
+  
 }
 
 
