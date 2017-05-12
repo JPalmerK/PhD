@@ -21,6 +21,7 @@ library(RColorBrewer)
 library(MuMIn) # for QIC
 #library("mvtnorm", lib.loc="~/R/win-library/3.3") # For mtvnorm- partial plots
 library(MASS) # for mvrnorm in boostrapping intervals 
+library(mvtnorm)
 
 OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
@@ -543,9 +544,9 @@ for(ii in 1:10){
   # Shore Dist Factors #
   #######################################################
   
-  SD_idx=which(grepl("Shore", colnames(BootstrapParameters)))
+  SD_idx=c(1, which(grepl("Shore", colnames(BootstrapParameters))))
   
-  coeffac <- c(grep("ShoreDist", colnames(model.matrix(mod))))
+  coeffac <- c(1,grep("ShoreDist", colnames(model.matrix(mod))))
   coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
   coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
   xvals <- data_sub[, which(names(data_sub) == "ShoreDist")]
@@ -567,7 +568,7 @@ for(ii in 1:10){
     BootstrapCoefs2$ShoreDist=colnames(rpreds)[1]
     
     # Recompile for plotting
-    for(jj in 2:ncol(BootstrapCoefs2)){
+    for(jj in 2:length(SD_idx)){
       temp=data.frame(vals=rpreds[,jj])
       temp$ShoreDist=colnames(rpreds)[jj]
       BootstrapCoefs2=rbind(BootstrapCoefs2, temp)
@@ -582,13 +583,15 @@ for(ii in 1:10){
   }
   BootstrapCoefs2$GroupId=unique(data_sub$GroupId)
   
+  ggplot(BootstrapCoefs2, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
+  
   #######################################################
   # Year as Factors #
   #######################################################
-  Yr_idx=which(grepl("Year", colnames(BootstrapParameters)))
+  Yr_idx=c(1,which(grepl("Year", colnames(BootstrapParameters))))
   
   
-  coeffac <- c(grep("Year", colnames(model.matrix(mod))))
+  coeffac <- c(1,grep("Year", colnames(model.matrix(mod))))
   coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
   coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
   xvals <- data_sub[, which(names(data_sub) == "Year")]
@@ -614,7 +617,7 @@ for(ii in 1:10){
     #############################
     
     
-    for(jj in 2:ncol(BootstrapCoefs3)){
+    for(jj in 2:ncol(rpreds)){
       temp=data.frame(vals=rpreds[,jj])
       temp$Year=colnames(rpreds)[jj]
       BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
@@ -630,12 +633,12 @@ for(ii in 1:10){
   
   BootstrapCoefs3$GroupId=unique(data_sub$GroupId)
   
-  # Yr_P[[ii]]=ggplot(BootstrapCoefs3_invlogit, aes(x=Year, y=vals)) + 
-  #   geom_boxplot() +
-  #   theme_minimal()+
-  #   ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
-  
-  
+   Yr_P[[ii]]=ggplot(BootstrapCoefs3, aes(x=Year, y=vals)) +
+     geom_boxplot() +
+     theme_minimal()+
+     ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
+
+
   
   # Add all data for plotting
   fitdf_jdate$GroupId=data_sub$GroupId[1]
@@ -682,12 +685,12 @@ ggplot(data=fitdf_jdate_out) +
 ggplot(data=fitdf_shoredist_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=ShoreDist, y=vals))
+  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals)))
 
 ggplot(data=fitdf_Year_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=Year, y=vals))
+  geom_boxplot(aes(x=Year, y=inv.logit(vals)))
 
 
   scale_colour_manual(values=cbbPalette) +
