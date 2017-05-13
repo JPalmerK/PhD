@@ -311,6 +311,7 @@ ModelTable$Nunits2013= 0
 ModelTable$Nunits2014= 0
 ModelTable$Nunits2015= 0
 ModelTable$CorrStuct='none'
+ModelTable$RsquaredAdj=0
 
 # list to store the models
 # list to store the models
@@ -327,7 +328,7 @@ for(ii in 1:10){
   ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
   ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
   ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
-  
+
   newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
   newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
                               OccAll=0,
@@ -415,6 +416,10 @@ if(ii==1){
 
 ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
 ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
+
+#Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
+ModelTable$RsquaredAdj[ii]=r.squaredGLMM(modlist[[ii]])
+  
 rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
@@ -685,10 +690,10 @@ ggplot(data=fitdf_jdate_out) +
 ggplot(data=fitdf_shoredist_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals)))
+  geom_boxplot(aes(x=ShoreDist, y=(vals)))
 
 ggplot(data=fitdf_Year_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=Year, y=inv.logit(vals)))
+  geom_boxplot(aes(x=Year, y=(vals)))
 
