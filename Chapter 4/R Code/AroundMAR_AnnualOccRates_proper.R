@@ -19,9 +19,7 @@ library(geepack)
 library(splines)
 library(RColorBrewer)
 library(MuMIn) # for QIC
-#library("mvtnorm", lib.loc="~/R/win-library/3.3") # For mtvnorm- partial plots
 library(MASS) # for mvrnorm in boostrapping intervals 
-library(mvtnorm)
 library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 
@@ -66,7 +64,7 @@ rm(meta_sub)
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod,data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  pred <- prediction(pr,data_sub$OccAll)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  pred <- prediction(pr,data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
   plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
