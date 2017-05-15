@@ -22,6 +22,8 @@ library(MuMIn) # for QIC
 #library("mvtnorm", lib.loc="~/R/win-library/3.3") # For mtvnorm- partial plots
 library(MASS) # for mvrnorm in boostrapping intervals 
 library(mvtnorm)
+library(ROCR)            # to build the ROC curve
+library(PresenceAbsence) # to build the confusion matrix
 
 OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
@@ -52,6 +54,61 @@ meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
 meta_sub=subset(meta, select=c('UnitLoc', 'Slope'))
 OccTable=merge(OccTable, meta_sub, all.x = TRUE)
 rm(meta_sub)
+
+
+################################################################################
+# Function to calculate AUC #
+################################################################################
+
+# This function calculates AUC for the model (to access model fit) taken from  
+# Pirotta E, Matthiopoulos J, MacKenzie M, Scott-Hayward L, Rendell L Modelling sperm whale habitat preference: a novel approach combining transect and follow data
+
+CalcAUC<-function(mod, data_sub){
+  
+  pr <- predict(mod,data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
+  pred <- prediction(pr,data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
+  plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
+  
+  
+  # Choice of the best cut-off probability
+  
+  y<-as.data.frame(perf@y.values)
+  x<-as.data.frame(perf@x.values)
+  fi <- atan(y/x) - pi/4                                             # to calculate the angle between the 45° line and the line joining the origin with the point (x;y) on the ROC curve
+  L <- sqrt(x^2+y^2)                                                 # to calculate the length of the line joining the origin to the point (x;y) on the ROC curve
+  d <- L*sin(fi)                                                     # to calculate the distance between the 45° line and the ROC curve
+  # write.table(d,"C:\\distances.txt")                                 # to write a table with the computed distances
+  
+  # The table should then be opened in Microsoft Excel to find the maximum distance with the command "Sort", and the relative position (i.e. the number of the corresponding record)
+  # MAX d= 0.1127967 --> position 39
+  
+  alpha<-as.data.frame(perf@alpha.values)                            # the alpha values represent the corresponding cut-offs
+  Best_cutoff=alpha[which.max(unlist(d)),]                                                       # to identify the alpha value (i.e. the cut-off) that corresponds to the maximum distance between the 45° line and the curve
+  
+  # Best cutoff:   0.3464173
+  # This value can now be used to build the confusion matrix:
+  
+  DATA<-matrix(0,nrow(data_sub),3)                                             # to build a matrix with 3 columns and n rows, where n is the dimension of the data set (here 919 - the number of rows can be checked with dim(dat)) 
+  DATA<-as.data.frame(DATA)
+  names(DATA)<-c("plotID","Observed","Predicted")
+  DATA$plotID<-1:nrow(data_sub)                                                # the first column is filled with an ID value that is unique for each row
+  DATA$Observed<-data_sub$BBOcc                                            # the second column reports the observed response (0s and 1s)
+  DATA$Predicted<-predict(modlist[[ii]],data_sub,type="response")                 # the third column reports the predictions
+  cmx(DATA, threshold = Best_cutoff)                                   # the identified cut-off must be used here
+  
+  # Area under the Curve 
+  auc <- unlist(performance(pred, measure="auc")@y.values)
+  
+  # Proportion of the presences correctly identified 
+  pres=prop.table(cmx(DATA, threshold = Best_cutoff))[1,1]
+  
+  # Proportion of the absences correctly idenified
+  abs=prop.table(cmx(DATA, threshold = Best_cutoff))[2,2]
+  
+  
+  return(c(auc, pres, abs))
+}
 
 
 ################################################################################
@@ -312,114 +369,121 @@ ModelTable$Nunits2014= 0
 ModelTable$Nunits2015= 0
 ModelTable$CorrStuct='none'
 ModelTable$RsquaredAdj=0
+ModelTable$AUC=0
+ModelTable$Pres=0
+ModelTable$Abs=0
+
 
 # list to store the models
 # list to store the models
 modlist=list()
 
 for(ii in 1:10){
-  data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
-  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
-  data_sub <- droplevels(data_sub)
+    data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+    data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+    data_sub <- droplevels(data_sub)
+    
+    
+    
+    
+    ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
+    ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
+    ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+  
+    newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
+    newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
+                                OccAll=0,
+                                ShoreDist=unique(newdat$ShoreDist),
+                                GroupId=unique(newdat$GroupId),
+                                Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
+    
+    
+    tryCatch({
+      ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
+    
+    tryCatch({
+      ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
+    
+    
+    tryCatch({
+      ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
+    
+    
+    
+    # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
+    # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
+    mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist+Year, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    mod2=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)   
+    mod3=geeglm(OccAll~bs(JulienDay)+Year, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)
+    mod4=geeglm(OccAll~ShoreDist+Year, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)
+    
+    Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
+    Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
+    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay)')
+    Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
+    
+    gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
+                              Qicdf$Varnames[2], '+',
+                              Qicdf$Varnames[3]))
+    if(ii==6 |ii==5|ii==7){
+      modlist[[ii]]=geeglm(formula = gee_form, 
+                           corstr = 'independence', 
+                           offset = BNDTotOffset, 
+                           family = binomial, 
+                           id     = UnitLoc, 
+                           data   = data_sub) 
+    }else{
+      modlist[[ii]]=geeglm(formula = gee_form, 
+                           corstr = 'ar1', 
+                           offset = BNDTotOffset, 
+                           family = binomial, 
+                           id     = UnitLoc, 
+                           data   = data_sub)}
+    
   
   
   
+  if(ii==1){
+    fit=cbind(newdat,  predictvcv(modlist[[ii]]))
+    dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+  }else {
+    fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
+    dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+  }
   
-  ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
-  ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
-  ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+    
+  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
+  ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
+  
+  #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
+  ModelTable$RsquaredAdj[ii]=r.squaredGLMM(modlist[[ii]])
+  
+  AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
+  ModelTable$AUC[ii]=AUCvals[1]
+  ModelTable$Pres[ii]=AUCvals[2]
+  ModelTable$Abs[ii]=AUCvals[3]
 
-  newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
-  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
-                              OccAll=0,
-                              ShoreDist=unique(newdat$ShoreDist),
-                              GroupId=unique(newdat$GroupId),
-                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
-  
-  
-  tryCatch({
-    ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
-  
-  tryCatch({
-    ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
-  
-  
-  tryCatch({
-    ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
-  
-  
-  
-  # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
-  # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-  mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist+Year, 
-              corstr = 'ar1', 
-              offset = BNDTotOffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub) 
-  
-  
-  
-  mod2=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
-              corstr = 'ar1', 
-              offset = BNDTotOffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub)   
-  mod3=geeglm(OccAll~bs(JulienDay)+Year, 
-              corstr = 'ar1', 
-              offset = BNDTotOffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub)
-  mod4=geeglm(OccAll~ShoreDist+Year, 
-              corstr = 'ar1', 
-              offset = BNDTotOffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub)
-  
-  Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
-  Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-  Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay)')
-  Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-  
-  gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-                            Qicdf$Varnames[2], '+',
-                            Qicdf$Varnames[3]))
-  if(ii==6 |ii==5|ii==7){
-    modlist[[ii]]=geeglm(formula = gee_form, 
-                         corstr = 'independence', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub) 
-  }else{
-    modlist[[ii]]=geeglm(formula = gee_form, 
-                         corstr = 'ar1', 
-                         offset = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub)}
-  
-
-
-
-if(ii==1){
-  fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-  dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
-}else {
-  fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-  dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
-}
-
-
-ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
-ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
-
-#Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
-ModelTable$RsquaredAdj[ii]=r.squaredGLMM(modlist[[ii]])
-  
 rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
