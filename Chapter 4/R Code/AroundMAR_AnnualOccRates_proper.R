@@ -224,7 +224,7 @@ mm=cbind(mm, aggregate(data=OccTable_daily, BBOcc~DayBin+GroupId+ShoreDist, FUN=
 colnames(mm)[5:7]=c('med', 'sum', 'n')
 
 library('Hmisc')
-mm=cbind(mm, binconf(x=mm$sum, n=mm$n, )[,2:3])
+mm=cbind(mm, binconf(x=mm$sum, n=mm$n)[,2:3])
 
 library(ggplot2)
 ggplot(data=mm, aes(x=med, y=BBOcc, color=ShoreDist)) +
@@ -460,14 +460,27 @@ for(ii in 1:10){
                            data   = data_sub)}
     
   
-  
-  
+    OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
+                                                      OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
+    OneYearAggs=cbind(OneYearAggs,
+                      aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)), 
+                                JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
+   
+    OneYearAggs=cbind(OneYearAggs,
+                      aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
+                                     BNDTotOffset~DayBin+GroupId+ShoreDist, FUN=mean))
+    colnames(OneYearAggs)[5]=c('med')
+    
   if(ii==1){
     fit=cbind(newdat,  predictvcv(modlist[[ii]]))
     dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+    AggData=OneYearAggs
+    
+    
   }else {
     fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
     dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+    AggData=rbind(AggData, OneYearAggs)
   }
   
     
@@ -486,9 +499,9 @@ rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
 
-mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
-mm$UnitLoc=paste(mm$GroupId, mm$ShoreDist, sep="_")
-mm_nocro=mm[mm$UnitLoc != 'Cro_05',]
+AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
+AggData$UnitLoc=paste(AggData$GroupId, AggData$ShoreDist, sep="_")
+AggData$BBEst=AggData$BNDTotOffset*AggData$OccAll
 
 fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
 
@@ -510,25 +523,8 @@ ggplot(data=dummyfit) +
   annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
               alpha=.2,linetype= 'blank') +
-  geom_point(data=mm, aes(x=DummyDate, y=BBOcc,
+  geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
                           color=ShoreDist), size=.9) 
-
-
-
-
-# Plot the data without Cromarty 05
-dummyfit$UnitLoc=paste(dummyfit$GroupId, dummyfit$ShoreDist, sep = '_')
-ggplot(data=dummyfit[dummyfit$UnitLoc != 'Cro_05',]) +
-  theme_bw() +
-  facet_wrap(~GroupId) +
-  scale_colour_manual(values=cbbPalette) +
-  geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
-  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank') +
-  geom_point(data=mm[mm$UnitLoc !='Cro_05',], aes(x=DummyDate, y=BBOcc,
-                                                  color=ShoreDist), size=.9) 
-
-
 
 
 
@@ -706,20 +702,30 @@ for(ii in 1:10){
      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
 
 
-  
-  # Add all data for plotting
+  #############################
+  # Add all data for plotting #
+  ############################
+   
   fitdf_jdate$GroupId=data_sub$GroupId[1]
-  
+   
+  OneYearAggs=data.frame(aggregate(data=data_sub, BBOcc~DayBin + GroupId, FUN=mean))
+  OneYearAggs=cbind(OneYearAggs,aggregate(data=data_sub, JulienDay~DayBin+GroupId, FUN=median)[,3])
+   
+   colnames(OneYearAggs)[4]=c('med')
   
   if(ii==1){
     fitdf_jdate_out=fitdf_jdate
     fitdf_shoredist_out=BootstrapCoefs2
     fitdf_Year_out=BootstrapCoefs3
     
+    AggData=OneYearAggs
+    
   }else {
     fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
     fitdf_shoredist_out=rbind(fitdf_shoredist_out, BootstrapCoefs2)
     fitdf_Year_out=rbind(fitdf_Year_out, BootstrapCoefs3)
+    
+    AggData=rbind(AggData, OneYearAggs)
   }
   rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
   
@@ -729,33 +735,59 @@ for(ii in 1:10){
 # Visualise partial plots with data
 
 
-mm=data.frame(aggregate(data=OccTable_daily, BBOcc~DayBin+GroupId, FUN=mean))
-mm$med=aggregate(data=OccTable_daily, JulienDay~DayBin+GroupId, FUN=median)[,3]
-mm$DummyDate=as.Date(mm$med, origin=as.Date("2013-01-01"))
-OccTable_daily$DummyDate=as.Date(OccTable_daily$JulienDay, origin=as.Date("2013-01-01"))
+# Bin the data for visualisation #
+OccTable_daily_wDetections$DayBin=cut(OccTable_daily_wDetections$JulienDay, breaks=20)
+
+
+AggData=data.frame(aggregate(data=OccTable_daily_wDetections, OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
+AggData=cbind(AggData, aggregate(data=OccTable_daily_wDetections, JulienDay~DayBin+GroupId+ShoreDist,
+                                 FUN=median)[,4])
+
+colnames(AggData)[5]=c('med')
+
+AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
+OccTable_daily_wDetections$DummyDate=as.Date(OccTable_daily_wDetections$JulienDay, origin=as.Date("2013-01-01"))
 
 
 ggplot(data=fitdf_jdate_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
+  #geom_point(data=AggData, aes(x=DummyDate, y=OccAll), size=.9) +
   geom_line(aes(DummyDate, y), size=1) +
   geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI),
               alpha=.2,linetype= 'blank') +
-  geom_rug(data=subset(OccTable_daily, OccAll==1), 
-           aes(x=DummyDate, y=OccAll*.3),
+  geom_rug(data=subset(OccTable_daily_wDetections, BBOcc==1), 
+           aes(x=DummyDate, y=BBOcc*.3),
            sides='t', alpha=.8) +
-  geom_rug(data=subset(OccTable_daily, OccAll==0), 
-           aes(x=DummyDate, y=OccAll),
+  geom_rug(data=subset(OccTable_daily_wDetections, BBOcc==0), 
+           aes(x=DummyDate, y=BBOcc),
            sides='b', alpha=.8) 
+
 
 ggplot(data=fitdf_shoredist_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=ShoreDist, y=(vals)))
+  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) 
+ 
 
 ggplot(data=fitdf_Year_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=Year, y=(vals)))
+  geom_boxplot(aes(x=Year, y=inv.logit(vals)))
+
+################################################################################
+# Occupancy rate seems to be correlated with AUC scores indicating that the models need
+# more detections in order to fit
+# Run Mann-Whiteney U test to determine if that's the case
+###############################################################################
+
+Group_OccRates=aggregate(data=OccTable_daily_wDetections, BBOcc~GroupId, FUN=mean)
+Group_OccRates$OccOrder=order(Group_OccRates$BBOcc)
+Group_OccRates$AucOrder=order(ModelTable$AUC)
+
+x=c(ModelTable$AUC, Group_OccRates$BBOcc)
+g=as.factor(c(rep('AUC',10),rep('OccRate',10)))
+
+wilcox.test(x ~ g) 
 
