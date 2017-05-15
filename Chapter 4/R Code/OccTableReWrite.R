@@ -152,6 +152,8 @@ Trains2013=read.csv("W:/KJP PHD/4-Bayesian Habitat Use/DolCPODFiles/2013_ClickTr
 Trains2014=read.csv("W:/KJP PHD/4-Bayesian Habitat Use/DolCPODFiles/2014_ClickTrainAnalysis.csv")
 Trains2015=read.csv("W:/KJP PHD/4-Bayesian Habitat Use/DolCPODFiles/2015_ClickTrainAnalysis.csv")
 
+Trains2013$TrainDay= as.numeric(substr((Trains2013$TrainDateNoTime), 1,2))
+Trains2014$TrainDay= as.numeric(substr((Trains2014$TrainDateNoTime), 1,2))
 
 Trains2013$Year=2013
 Trains2014$Year=2014
