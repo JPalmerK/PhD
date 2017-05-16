@@ -549,7 +549,7 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
 
 
 ##################################################################
-# Get the Partial Residuals for each plot Group ID               #
+# Get the Partial Plots for each plot Group ID               #
 ##################################################################
 
 # Code based on MUMIN run.partials Scott-Hayward 2015
@@ -584,6 +584,8 @@ for(ii in 1:10){
   }
   
   BootstrapParameters<-mvrnorm(10000, coef(mod), summary(mod)$cov.unscaled)
+  test<- glm(formula(mod),family=binomial, data=data_sub)
+  
   #######################################################
   # Julien Date Smoothes #
   #######################################################
@@ -592,7 +594,7 @@ for(ii in 1:10){
   
   
   
-  test<- glm(formula(mod),family=binomial, data=data_sub)
+  
   x1<-model.matrix(test)[,BS_idx]%*%coef(mod)[BS_idx]
   
   
