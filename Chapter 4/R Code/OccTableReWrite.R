@@ -449,19 +449,23 @@ OccTable=OccTable[!duplicated(OccTable[,1:3]),]
   Bndcod=aggregate(EncounterSpp~UnitLoc+RoundedMatlabDate+Hr, data=subset(Trains, EncounterSpp=='COD/BND'), FUN=length)
   Bndcod$BBOcc=1
   OccTable=merge(OccTable, subset(Bndcod, select=-c(EncounterSpp)), by=c('UnitLoc', 'RoundedMatlabDate', 'Hr'), all.x = T)
+  OccTable$BBOcc[is.na(OccTable$BBOcc)]=0
   
   WBDRsd=aggregate(EncounterSpp~UnitLoc+RoundedMatlabDate+Hr, data=subset(Trains, EncounterSpp=='WBD/RSD'), FUN=length)
   WBDRsd$FBOcc=1
   OccTable=merge(OccTable, subset(WBDRsd, select=-c(EncounterSpp)), by=c('UnitLoc', 'RoundedMatlabDate', 'Hr'), all.x = T)
+  OccTable$FBOcc[is.na(OccTable$FBOcc)]=0
   
   
   Unk=aggregate(EncounterSpp~UnitLoc+RoundedMatlabDate+Hr, data=subset(Trains, EncounterSpp=='UNK'), FUN=length)
   Unk$UNKOcc=1
   OccTable=merge(OccTable, subset(Unk, select=-c(EncounterSpp)), by=c('UnitLoc', 'RoundedMatlabDate', 'Hr'), all.x = T)
+  OccTable$UNKOcc[is.na(OccTable$UNKOcc)]=0
   
-  mm=as.matrix(t(apply(OccTable[,21:23], 1, FUN=sum, na.rm=T)))
-  OccTable$OccAll= mm[1,]/mm[1,]
-  OccTable$OccAll[is.nan(OccTable$OccAll)]=0
+  OccTable$OccAll=(OccTable$BBOcc+OccTable$FBOcc+OccTable$UNKOcc)
+  OccTable$OccAll=ifelse(OccTable$OccAll>0, OccTable$OccAll/OccTable$OccAll, OccTable$OccAll)
+  
+
   rm(WBDRsd, Unk, Bndcod, Trains2015, Trains2014, Trains2013, Trains)
 #######################################################################################     mm= merge.with.order(tempdf, Pdetdf, by=c('UnitLoc','Date',  'Hr', 'Year'),
 
