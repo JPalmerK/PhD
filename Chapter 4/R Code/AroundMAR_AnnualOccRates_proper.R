@@ -10,18 +10,19 @@
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
 rm(list=ls())
-library(boot) # for inv.logit
+library(boot)            # for inv.logit
 library(mgcv)
 library(ggplot2)
 library(lme4)
-library(dplyr) # for distinct function 
+library(dplyr)           # for distinct function 
 library(geepack)
 library(splines)
 library(RColorBrewer)
-library(MuMIn) # for QIC
-library(MASS) # for mvrnorm in boostrapping intervals 
+library(MuMIn)           # for QIC
+library(MASS)            # for mvrnorm in boostrapping intervals 
 library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
+library(mvtnorm)         # for rmvnorm used in predictions/plotting
 
 OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
@@ -525,6 +526,11 @@ ggplot(data=dummyfit) +
               alpha=.2,linetype= 'blank') +
   geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
                           color=ShoreDist), size=.9) 
+
+ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
+                         color=ShoreDist), size=.9)+
+  geom_point()+
+  
 
 
 
