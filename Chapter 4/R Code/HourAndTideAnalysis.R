@@ -164,7 +164,7 @@ OccTable_DPD=subset(OccTable, SumHrlyDet>0 )
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod,data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  pred <- prediction(pr,data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  pred <- prediction(pr,data_sub$OccAll)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
   plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
@@ -191,8 +191,8 @@ CalcAUC<-function(mod, data_sub){
   DATA<-as.data.frame(DATA)
   names(DATA)<-c("plotID","Observed","Predicted")
   DATA$plotID<-1:nrow(data_sub)                                                # the first column is filled with an ID value that is unique for each row
-  DATA$Observed<-data_sub$BBOcc                                                # the second column reports the observed response (0s and 1s)
-  DATA$Predicted<-predict(modlist[[ii]],data_sub,type="response")              # the third column reports the predictions
+  DATA$Observed<-data_sub$OccAll                                                # the second column reports the observed response (0s and 1s)
+  DATA$Predicted<-predict(mod,data_sub,type="response")              # the third column reports the predictions
   cmx(DATA, threshold = Best_cutoff)                                           # the identified cut-off must be used here
   
   # Area under the Curve 
@@ -380,7 +380,7 @@ QIC(geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+Sh
            family = binomial, # leave out constrains
            id=GroupId:Date, 
            offset = BNDTotOffset, 
-           data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])) ] #19211.52 (3)
+           data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]))  #19211.52 (3)
 
 # Knock out hour of day
 QIC(geeglm(OccAll ~GroupId+ShoreDist+Year+HourAfterHigh,
@@ -397,6 +397,8 @@ mod=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+Ho
            id=GroupId:Date, 
            offset = BNDTotOffset, 
            data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
+
+
 # Since yar does't give us much lets compare the models
 mod1=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+HourAfterHigh+GroupId+ShoreDist,
             corstr = 'ar1', 
@@ -410,4 +412,10 @@ QIC(mod, mod1)
 # Year doesn't do too much one way or the other (delta QIC=.07)
 summary(mod)
 #####################################################################################################################
+
+CalcAUC(mod, data_sub=OccTable_DPD)
+
+
+
+
 

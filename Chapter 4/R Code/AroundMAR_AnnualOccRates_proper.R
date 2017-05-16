@@ -93,7 +93,7 @@ CalcAUC<-function(mod, data_sub){
   names(DATA)<-c("plotID","Observed","Predicted")
   DATA$plotID<-1:nrow(data_sub)                                                # the first column is filled with an ID value that is unique for each row
   DATA$Observed<-data_sub$BBOcc                                            # the second column reports the observed response (0s and 1s)
-  DATA$Predicted<-predict(modlist[[ii]],data_sub,type="response")                 # the third column reports the predictions
+  DATA$Predicted<-predict(mod,data_sub,type="response")                 # the third column reports the predictions
   cmx(DATA, threshold = Best_cutoff)                                   # the identified cut-off must be used here
   
   # Area under the Curve 
