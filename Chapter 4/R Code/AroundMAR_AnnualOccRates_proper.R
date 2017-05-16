@@ -209,7 +209,7 @@ rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
 
 
 ###############################################################################
-# Data vis #
+# Data Exploration/Viz #
 ##############################################################################
 
 
@@ -319,8 +319,7 @@ Basic_table_bb=merge(Basic_table_bb, temp6, all = TRUE, by='UnitLoc')
 Basic_table_bb=merge(Basic_table_bb, temp7, all = TRUE, by='UnitLoc')
 Basic_table_bb=merge(Basic_table_bb, temp8, all = TRUE, by='UnitLoc')
 
-# Reorder
-
+# Reorder (this could be done programatically but there ar only 10 groups, so it's fine)
 Basic_table_bb=Basic_table_bb[, c(1,2,5,8, 3,6,9, 4,7,10)]
 
 rm(temp1, temp2, temp3, temp4,temp5,temp6, temp7, temp8)
@@ -328,6 +327,7 @@ rm(temp1, temp2, temp3, temp4,temp5,temp6, temp7, temp8)
 colnames(Basic_table_bb)=c('UnitLoc', 'NDetections2013', 'NDays2013', 'PropOccupied2013'
                         , 'NDetections2014', 'NDays2014', 'PropOccupied2014'
                         , 'NDetections2015', 'NDays2015', 'PropOccupied2015')
+
 Basic_table_bb[is.na(Basic_table_bb)]=0
 
 library(binom)
@@ -357,7 +357,7 @@ OccTable_daily_wDetections= OccTable_daily[OccTable_daily$YrUnitLoc %in%
 
 OccTable_daily_wDetections=droplevels(OccTable_daily_wDetections)
 
-
+# Table to store model performance #
 ModelTable=data.frame(DeplotymentLoc=unique(OccTable$GroupId))
 ModelTable$ModelFormula='dunno'
 ModelTable$Data2013='none'
@@ -373,8 +373,7 @@ ModelTable$Pres=0
 ModelTable$Abs=0
 
 
-# list to store the models
-# list to store the models
+# list to store the models #
 modlist=list()
 
 for(ii in 1:10){
@@ -460,7 +459,7 @@ for(ii in 1:10){
                            id     = UnitLoc, 
                            data   = data_sub)}
     
-  
+    # Aggregate data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
                                                       OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
     OneYearAggs=cbind(OneYearAggs,
@@ -470,18 +469,22 @@ for(ii in 1:10){
     OneYearAggs=cbind(OneYearAggs,
                       aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
                                      BNDTotOffset~DayBin+GroupId+ShoreDist, FUN=mean))
+    
+    
     colnames(OneYearAggs)[5]=c('med')
+    OneYearAggs$JulienDay=OneYearAggs$med
+    OneYearAggs$Year=unique(newdat_perdOnly$Year)
     
   if(ii==1){
     fit=cbind(newdat,  predictvcv(modlist[[ii]]))
     dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
-    AggData=OneYearAggs
+    AggData=cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs))
     
     
   }else {
     fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
     dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
-    AggData=rbind(AggData, OneYearAggs)
+    AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
   }
   
     
@@ -500,12 +503,12 @@ rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
 
+# Add dummy dates for plotting (to fix the X axis)
 AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
 AggData$UnitLoc=paste(AggData$GroupId, AggData$ShoreDist, sep="_")
 AggData$BBEst=AggData$BNDTotOffset*AggData$OccAll
 
 fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
-
 dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
 
 
@@ -527,9 +530,16 @@ ggplot(data=dummyfit) +
   geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
                           color=ShoreDist), size=.9) 
 
+# Re-plot but limit the x axis to points where data were collected
 ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
-                         color=ShoreDist), size=.9)+
-  geom_point()+
+                         color=ShoreDist), size=.9) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  geom_point() +
+  scale_colour_manual(values=cbbPalette) +
+  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
+  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.2,linetype= 'blank', inherit.aes = FALSE)
   
 
 
