@@ -528,7 +528,9 @@ ggplot(data=dummyfit) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
               alpha=.2,linetype= 'blank') +
   geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
-                          color=ShoreDist), size=.9) 
+                          color=ShoreDist), size=.9) +
+  xlab("") +
+  ylab("")
 
 # Re-plot but limit the x axis to points where data were collected
 ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
@@ -546,23 +548,30 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
   
 
 
+##################################################################
+# Get the Partial Residuals for each plot Group ID               #
+##################################################################
 
-# Get the Partial Residuals for each plot Group ID
+# Code based on MUMIN run.partials Scott-Hayward 2015
+
 
 # Plot Storage
 p=list()
 Sd_P=list()
 Yr_P=list()
 
-# in the model coeficients there is not 2013 or 05 shroe distance
+
 for(ii in 1:10){
   
+  # Again subset the data
   data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
   data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
   data_sub <- droplevels(data_sub)
   
-  
+  # Add a dummy date for plotting
   data_sub$DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01"))
+  
+  # Extract model (just for clarity)
   mod=modlist[[ii]]
   
   JdateForPlotting<- seq(min(data_sub$JulienDay), max(data_sub$JulienDay))
@@ -781,19 +790,32 @@ ggplot(data=fitdf_jdate_out) +
            sides='t', alpha=.8) +
   geom_rug(data=subset(OccTable_daily_wDetections, BBOcc==0), 
            aes(x=DummyDate, y=BBOcc),
-           sides='b', alpha=.8) 
+           sides='b', alpha=.8) +
+  xlab("") +
+  ylab("") 
+
 
 
 ggplot(data=fitdf_shoredist_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) 
+  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) +
+  scale_x_discrete(breaks=unique(fitdf_shoredist_out$ShoreDist),
+                     labels=c("Near", "Mid", "Off")) +
+  xlab("") +
+  ylab("")
+
  
 
 ggplot(data=fitdf_Year_out) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_boxplot(aes(x=Year, y=inv.logit(vals)))
+  geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
+  scale_x_discrete(breaks=unique(fitdf_Year_out$Year),
+                   labels=c("2013", "2014", "2015")) +
+  xlab("") +
+  ylab("")
+
 
 ################################################################################
 # Occupancy rate seems to be correlated with AUC scores indicating that the models need
