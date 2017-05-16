@@ -539,7 +539,10 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
   scale_colour_manual(values=cbbPalette) +
   annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
   geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank', inherit.aes = FALSE)
+              alpha=.2,linetype= 'blank') +
+  geom_line(aes(x=DummyDate, y=inv.logit(fit)), size=.5) +
+  xlab("") +
+  ylab("")
   
 
 
