@@ -583,7 +583,7 @@ for(ii in 1:10){
     JdateForPlotting=JdateForPlotting[-runif(length(JdateForPlotting) %% 10, min=1, max=length(JdateForPlotting))]
   }
   
-  BootstrapParameters<-mvrnorm(10000, coef(mod), summary(mod)$cov.unscaled)
+  BootstrapParameters<-mvrnorm(1000, coef(mod), summary(mod)$cov.unscaled)
   test<- glm(formula(mod),family=binomial, data=data_sub)
   
   #######################################################
@@ -591,9 +591,6 @@ for(ii in 1:10){
   #######################################################
   # Get the smoothed index terms 
   BS_idx=which(grepl("bs", colnames(BootstrapParameters)))
-  
-  
-  
   
   x1<-model.matrix(test)[,BS_idx]%*%coef(mod)[BS_idx]
   
