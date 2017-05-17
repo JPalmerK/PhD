@@ -15,6 +15,7 @@ library(RColorBrewer)
 library(MuMIn) # for QIC
 library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
+library(mvtnorm)
 
 setwd("W:/KJP PHD/4-Bayesian Habitat Use/R Code")
 
@@ -355,13 +356,7 @@ CalcAUC<-function(mod, data_sub){
 # # TideIntl    19728.36
 # # TideREGroup 19754.79
 
- # empty       19744
- # TideDl      19709
- # Tides       19717
- # TideIntl    19730
- # TideREGroup 19756
- # TidesPh     19720
- # TideIntS    19736 
+
  
  
 # #########################################################################################################################
@@ -439,12 +434,19 @@ mod1=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+G
             offset = BNDTotOffset,
             data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
 
-# QIC(mod, mod1)
+mod9=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+bs(HourAfterHigh, degree = 2)+GroupId+ShoreDist+Year,
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=GroupId:Date,
+            offset = BNDTotOffset,
+            data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
+
+ QIC(mod, mod1)
 
 # Year doesn't do too much one way or the other (delta QIC=.07) so knock it out (Also the ROC plot does much better)
-mod=mod1
-summary(mod)
 
+summary(mod)
+mod=mod1
 #####################################################################################################################
 # Explore AUC values #
 #####################################################################################################################
@@ -458,20 +460,7 @@ CalcAUC(mod, data_sub=data)
 # Create the Partial Plots #
 ##############################################################################################################
 
-#######################################################
-# Julien Date Smoothes #
-#######################################################
 
-
-
-
-HrForPlotting<- seq(min(data$HourAfterPeakSolEle), max(data$HourAfterPeakSolEle), length.out = 500)
-BootstrapParameters<-mvrnorm(500, coef(mod), summary(mod)$cov.unscaled)
-test<- glm(formula(mod),family=binomial, data=data)
-
-
-BootstrapParameters<-rmvnorm(500, coef(mod), summary(mod)$cov.unscaled)
-test<- glm(formula(mod),family=binomial, data=data)
 
 #######################################################
 # Julien Date Smoothes #
@@ -506,7 +495,7 @@ partialDF=function(mod, data, Variable){
   partialfit <- mod$family$linkinv(partialfit)
   cis <- mod$family$linkinv(cis)
   
-  fitdf=data.frame(x=HrForPlotting, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
+  fitdf=data.frame(x=newX, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
   
   return(fitdf)
 }
@@ -569,6 +558,7 @@ fitdf_Year=partialdf_factor(mod, data, 'Year')
 # Aggregate the data for plotting
 aggdata_hour=data.frame(aggregate(data=data, BBOcc~HourAfterPeakSolEle, FUN=mean))
 aggdata_tide=data.frame(aggregate(data=data, BBOcc~HourAfterHigh, FUN=mean))
+aggdata_GroupId=data.frame(aggregate(data=data, BBOcc~GroupId, FUN=mean))
 
 # Partial plot for hour after solar noon
 ggplot(data=fitdf_Hour) +
@@ -576,7 +566,7 @@ ggplot(data=fitdf_Hour) +
   scale_colour_manual(values=cbbPalette) +
   geom_line(aes(x, y), size=1) +  
   geom_ribbon(aes(x=x, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
-  geom_point(data=aggdata, aes(x=HourAfterPeakSolEle, y=BBOcc)) +
+  geom_point(data=aggdata_hour, aes(x=HourAfterPeakSolEle, y=BBOcc)) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Occupancy Probability') 
 
@@ -590,6 +580,29 @@ ggplot(data=fitdf_tide) +
   xlab('Hour After High Tide') +
   ylab('Hour') 
 
+ggplot(data=fitdf_ShoreDist) +
+  theme_bw() +
+  geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) +
+  scale_x_discrete(breaks=unique(fitdf_ShoreDist$ShoreDist),
+                   labels=c("Near", "Mid", "Off")) +
+  xlab("") +
+  ylab("")
+
+ggplot(data=fitdf_Year) +
+  theme_bw() +
+  geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
+  scale_x_discrete(breaks=unique(fitdf_Year$Year),
+                   labels=c("2013", "2014", "2015")) +
+  xlab("") +
+  ylab("")
+
+ggplot(data=fitdf_GroupId) +
+  theme_bw() +
+  geom_boxplot(aes(x=GroupId, y=inv.logit(vals)))+
+  scale_x_discrete(breaks=unique(fitdf_GroupId$GroupId),
+                   labels=unique(data$GroupId)) +
+  xlab("") +
+  ylab("")
 
 
 
