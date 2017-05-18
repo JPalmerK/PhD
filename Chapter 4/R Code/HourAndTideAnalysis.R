@@ -555,7 +555,9 @@ fitdf_Hour=partialDF(mod, data, 'HourAfterPeakSolEle')
 fitdf_tide=partialDF(mod, data, 'HourAfterHigh')
 fitdf_GroupId=partialdf_factor(mod, data, 'GroupId')
 fitdf_ShoreDist=partialdf_factor(mod, data, 'ShoreDist')
-fitdf_Year=partialdf_factor(mod, data, 'Year')
+
+# Year knocked out
+# fitdf_Year=partialdf_factor(mod, data, 'Year')
 
 
 # Aggregate the data for plotting
@@ -592,14 +594,16 @@ ggplot(data=fitdf_ShoreDist) +
   xlab("") +
   
   ylab("")
-# Partial plot foryear
-ggplot(data=fitdf_Year) +
-  theme_bw() +
-  geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
-  scale_x_discrete(breaks=unique(fitdf_Year$Year),
-                   labels=c("2013", "2014", "2015")) +
-  xlab("") +
-  ylab("")
+
+# # Partial plot for year
+# Year knocked out
+# ggplot(data=fitdf_Year) +
+#   theme_bw() +
+#   geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
+#   scale_x_discrete(breaks=unique(fitdf_Year$Year),
+#                    labels=c("2013", "2014", "2015")) +
+#   xlab("") +
+#   ylab("")
 
 ggplot(data=fitdf_GroupId) +
   theme_bw() +
