@@ -564,6 +564,11 @@ aggdata_hour=data.frame(aggregate(data=data, BBOcc~HourAfterPeakSolEle, FUN=mean
 aggdata_tide=data.frame(aggregate(data=data, BBOcc~HourAfterHigh, FUN=mean))
 aggdata_GroupId=data.frame(aggregate(data=data, BBOcc~GroupId, FUN=mean))
 
+
+# 
+data_sub=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
+data_sub$DecHour=data_sub$MatlabDate[1]-floor(data_sub$MatlabDate[1])*24
+
 # Partial plot for hour after solar noon
 ggplot(data=fitdf_Hour) +
   theme_bw()+
@@ -571,6 +576,12 @@ ggplot(data=fitdf_Hour) +
   geom_line(aes(HourAfterPeakSolEle, y), size=1) +  
   geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_hour, aes(x=HourAfterPeakSolEle, y=BBOcc)) +
+  geom_rug(data=subset(data_sub, BBOcc==1), 
+           aes(x=jitter(HourAfterPeakSolEle,2), y=OccAll*.1),
+           sides='t', alpha=.8) +
+  geom_rug(data=subset(data_sub, BBOcc==0), 
+           aes(x=jitter(HourAfterPeakSolEle,2), y=OccAll),
+           sides='b', alpha=.8) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Occupancy Probability') 
 
