@@ -496,7 +496,7 @@ partialDF=function(mod, data, Variable){
   cis <- mod$family$linkinv(cis)
   
   fitdf=data.frame(x=newX, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
-  
+  colnames(fitdf)[1]=Variable
   return(fitdf)
 }
 
@@ -515,11 +515,11 @@ partialdf_factor=function(mod, data, variable){
     rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
   }
   
-  if((length(coefpos)-1)>1){
+  if((length(coefpos))>1){
     
     rpreds <- as.data.frame(rcoefs[, c(coefpos)])
     BootstrapCoefs3=data.frame(vals=rpreds[,1])
-    BootstrapCoefs3$FactorVariable=levels(xvals)[1]
+    BootstrapCoefs3$FactorVariable=as.factor(paste(variable, levels(xvals)[1], sep = ''))
     
     ############################
     # Recompile for plotting #
@@ -528,7 +528,7 @@ partialdf_factor=function(mod, data, variable){
     
     for(jj in 2:ncol(rpreds)){
       temp=data.frame(vals=rpreds[,jj])
-      temp$FactorVariable=colnames(rpreds)[jj]
+      temp$FactorVariable=as.factor(colnames(rpreds)[jj])
       BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
       rm(temp)
     }
@@ -538,14 +538,17 @@ partialdf_factor=function(mod, data, variable){
     rpreds <- rcoefs[,coefpos]
     BootstrapCoefs3=data.frame(vals=rpreds)
     BootstrapCoefs3$FactorVariable=colnames(model.matrix(mod))[coefpos[2:length(coefpos)]]
+    
   }
   
   fitdf=BootstrapCoefs3
   colnames(fitdf)[2]=variable
+  
   return(fitdf)
   
   
 }
+
 
 
 fitdf_Hour=partialDF(mod, data, 'HourAfterPeakSolEle')
@@ -564,8 +567,8 @@ aggdata_GroupId=data.frame(aggregate(data=data, BBOcc~GroupId, FUN=mean))
 ggplot(data=fitdf_Hour) +
   theme_bw()+
   scale_colour_manual(values=cbbPalette) +
-  geom_line(aes(x, y), size=1) +  
-  geom_ribbon(aes(x=x, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
+  geom_line(aes(HourAfterPeakSolEle, y), size=1) +  
+  geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_hour, aes(x=HourAfterPeakSolEle, y=BBOcc)) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Occupancy Probability') 
@@ -574,20 +577,22 @@ ggplot(data=fitdf_Hour) +
 ggplot(data=fitdf_tide) +
   theme_bw()+
   scale_colour_manual(values=cbbPalette) +
-  geom_line(aes(x, y), size=1) +  
-  geom_ribbon(aes(x=x, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
+  geom_line(aes(HourAfterHigh, y), size=1) +  
+  geom_ribbon(aes(x=HourAfterHigh, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=BBOcc)) +
   xlab('Hour After High Tide') +
   ylab('Hour') 
 
+# Partial plot for shore dist
 ggplot(data=fitdf_ShoreDist) +
   theme_bw() +
   geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) +
   scale_x_discrete(breaks=unique(fitdf_ShoreDist$ShoreDist),
                    labels=c("Near", "Mid", "Off")) +
   xlab("") +
+  
   ylab("")
-
+# Partial plot foryear
 ggplot(data=fitdf_Year) +
   theme_bw() +
   geom_boxplot(aes(x=Year, y=inv.logit(vals)))+

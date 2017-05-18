@@ -410,20 +410,20 @@ for(ii in 1:10){
     
     # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
     # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-    mod1=geeglm(OccAll~bs(JulienDay)+ShoreDist+Year, 
+    mod1=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+ShoreDist+Year, 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
-    mod2=geeglm(OccAll~bs(JulienDay)+ShoreDist, 
+    mod2=geeglm(OccAll~bs(JulienDay, , knots = mean(JulienDay))+ShoreDist, 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub)   
-    mod3=geeglm(OccAll~bs(JulienDay)+Year, 
+    mod3=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+Year, 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
@@ -438,7 +438,7 @@ for(ii in 1:10){
     
     Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
     Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay)')
+    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay, knots = mean(JulienDay))')
     Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
     
     gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
@@ -553,6 +553,87 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
 ##################################################################
 
 # Code based on MUMIN run.partials Scott-Hayward 2015
+partialDF=function(mod, data, Variable){
+  
+  coefpos <- c(1, grep(Variable, colnames(model.matrix(mod))))
+  xvals <- data[, which(names(data) == Variable)]
+  newX <- seq(min(xvals), max(xvals), length = 500)
+  eval(parse(text = paste(Variable, "<- newX", 
+                          sep = "")))
+  response <- rep(1, 500)
+  newBasis <- eval(parse(text = labels(terms(mod))[grep(Variable, 
+                                                        labels(terms(mod)))]))
+  partialfit <- cbind(rep(1, 500), newBasis) %*% coef(mod)[coefpos]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == 
+                                      T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
+  }
+  rpreds <- cbind(rep(1, 500), newBasis) %*% t(rcoefs[, 
+                                                      coefpos])
+  quant.func <- function(x) {
+    quantile(x, probs = c(0.025, 0.975))
+  }
+  cis <- t(apply(rpreds, 1, quant.func))
+  
+  partialfit <- mod$family$linkinv(partialfit)
+  cis <- mod$family$linkinv(cis)
+  
+  fitdf=data.frame(x=newX, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
+  colnames(fitdf)[1]=Variable
+  return(fitdf)
+}
+
+partialdf_factor=function(mod, data, variable){
+  coeffac <- c(1,grep(variable, colnames(model.matrix(mod))))
+  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
+  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
+  xvals <- data[, which(names(data) == variable)]
+  newX <- sort(unique(xvals))
+  newX <- newX[2:length(newX)]
+  partialfit <- coef(mod)[c(coefpos)]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
+  }
+  
+  if((length(coefpos))>1){
+    
+    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
+    BootstrapCoefs3=data.frame(vals=rpreds[,1])
+    BootstrapCoefs3$FactorVariable=as.factor(paste(variable, levels(xvals)[1], sep = ''))
+    
+    ############################
+    # Recompile for plotting #
+    #############################
+    
+    
+    for(jj in 2:ncol(rpreds)){
+      temp=data.frame(vals=rpreds[,jj])
+      temp$FactorVariable=as.factor(colnames(rpreds)[jj])
+      BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
+      rm(temp)
+    }
+    
+  }else{
+    
+    rpreds <- rcoefs[,coefpos]
+    BootstrapCoefs3=data.frame(vals=rpreds)
+    BootstrapCoefs3$FactorVariable=colnames(model.matrix(mod))[coefpos[2:length(coefpos)]]
+
+  }
+  
+  fitdf=BootstrapCoefs3
+  colnames(fitdf)[2]=variable
+ 
+  return(fitdf)
+  
+  
+}
 
 
 # Plot Storage
@@ -574,44 +655,12 @@ for(ii in 1:10){
   # Extract model (just for clarity)
   mod=modlist[[ii]]
   
-  JdateForPlotting<- seq(min(data_sub$JulienDay), max(data_sub$JulienDay))
-  YearsForPlotting=unique(data_sub$Year)
-  ShoreDistForPlotting=unique(data_sub$ShoreDist)
-  
-  # Trim Julien Date to be divisible by 10 
-  if (length(JdateForPlotting) %% 10>0){
-    JdateForPlotting=JdateForPlotting[-runif(length(JdateForPlotting) %% 10, min=1, max=length(JdateForPlotting))]
-  }
-  
-  BootstrapParameters<-mvrnorm(1000, coef(mod), summary(mod)$cov.unscaled)
-  test<- glm(formula(mod),family=binomial, data=data_sub)
-  
   #######################################################
   # Julien Date Smoothes #
   #######################################################
-  # Get the smoothed index terms 
-  BS_idx=which(grepl("bs", colnames(BootstrapParameters)))
+  fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   
-  x1<-model.matrix(test)[,BS_idx]%*%coef(mod)[BS_idx]
-  
-  
-  BootstrapCoefs<- BootstrapParameters[,c(1, BS_idx)]
-  Basis<- cbind(rep(1,10), bs(JdateForPlotting))
-  
-  RealFit<- Basis%*%coef(mod)[c(1, BS_idx)]
-  RealFitCenter1<- RealFit-mean(x1)-coef(mod)[1]
-  BootstrapFits<- Basis%*%t(BootstrapCoefs)
-  quant.func<- function(x){quantile(x, probs=c(0.025,0.975))}
-  
-  cis<-apply(BootstrapFits, 1, quant.func)
-  MinimumYlim1<- min(cis-mean(x1)-coef(mod)[1])
-  MaximumYlim1<- max(cis-mean(x1)-coef(mod)[1])
-  cil1<-cis[1,]-mean(x1)-coef(mod)[1]
-  ciu1<-cis[2,]-mean(x1)-coef(mod)[1]
-  
-  
-  fitdf_jdate=data.frame(x=JdateForPlotting, y=inv.logit(RealFitCenter1), LCI=inv.logit(cil1), UCI=inv.logit(ciu1))  
-  fitdf_jdate$DummyDate=as.Date(JdateForPlotting, origin=as.Date("2013-01-01"))
+  fitdf_jdate$DummyDate=as.Date(JulienDay, origin=as.Date("2013-01-01"))
   
   
   
@@ -634,94 +683,19 @@ for(ii in 1:10){
   # Shore Dist Factors #
   #######################################################
   
-  SD_idx=c(1, which(grepl("Shore", colnames(BootstrapParameters))))
-  
-  coeffac <- c(1,grep("ShoreDist", colnames(model.matrix(mod))))
-  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
-  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
-  xvals <- data_sub[, which(names(data_sub) == "ShoreDist")]
-  newX <- sort(unique(xvals))
-  newX <- newX[2:length(newX)]
-  partialfit <- coef(mod)[c(coefpos)]
-  rcoefs <- NULL
-  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
-      silent = T)
-  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
-    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
-  }
-  
-  
-  if(length(SD_idx)>1){
-    
-    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
-    BootstrapCoefs2=data.frame(vals=rpreds[,1])
-    BootstrapCoefs2$ShoreDist=colnames(rpreds)[1]
-    
-    # Recompile for plotting
-    for(jj in 2:length(SD_idx)){
-      temp=data.frame(vals=rpreds[,jj])
-      temp$ShoreDist=colnames(rpreds)[jj]
-      BootstrapCoefs2=rbind(BootstrapCoefs2, temp)
-      rm(temp)
-    }
-    
-  }else{
-    
-    rpreds <- rcoefs[,coefpos]
-    BootstrapCoefs2=data.frame(vals=rpreds)
-    BootstrapCoefs2$ShoreDist=colnames(BootstrapParameters)[SD_idx]
-  }
-  BootstrapCoefs2$GroupId=unique(data_sub$GroupId)
+  BootstrapCoefs2=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
+  BootstrapCoefs2$GroupId=data_sub$GroupId[1]
   
   ggplot(BootstrapCoefs2, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
   
   #######################################################
   # Year as Factors #
   #######################################################
-  Yr_idx=c(1,which(grepl("Year", colnames(BootstrapParameters))))
+  BootstrapCoefs3 = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
+  BootstrapCoefs3$GroupId=data_sub$GroupId[1]
   
+  ggplot(BootstrapCoefs3, aes(x=Year, y=inv.logit(vals)))+geom_violin()
   
-  coeffac <- c(1,grep("Year", colnames(model.matrix(mod))))
-  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
-  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
-  xvals <- data_sub[, which(names(data_sub) == "Year")]
-  newX <- sort(unique(xvals))
-  newX <- newX[2:length(newX)]
-  partialfit <- coef(mod)[c(coefpos)]
-  rcoefs <- NULL
-  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
-      silent = T)
-  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
-    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
-  }
-  
-  
-  if(length(Yr_idx)>1){
-    
-    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
-    BootstrapCoefs3=data.frame(vals=rpreds[,1])
-    BootstrapCoefs3$Year=colnames(rpreds)[1]
-    
-    ############################
-    # Recompile for plotting #
-    #############################
-    
-    
-    for(jj in 2:ncol(rpreds)){
-      temp=data.frame(vals=rpreds[,jj])
-      temp$Year=colnames(rpreds)[jj]
-      BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
-      rm(temp)
-    }
-    
-  }else{
-    
-    rpreds <- rcoefs[,coefpos]
-    BootstrapCoefs3=data.frame(vals=rpreds)
-    BootstrapCoefs3$Year=colnames(model.matrix(mod))[Yr_idx]
-  }
-  
-  BootstrapCoefs3$GroupId=unique(data_sub$GroupId)
   
    Yr_P[[ii]]=ggplot(BootstrapCoefs3, aes(x=Year, y=vals)) +
      geom_boxplot() +
@@ -801,8 +775,8 @@ ggplot(data=fitdf_shoredist_out) +
   geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) +
   scale_x_discrete(breaks=unique(fitdf_shoredist_out$ShoreDist),
                      labels=c("Near", "Mid", "Off")) +
-  xlab("") +
-  ylab("")
+  ylab("Occupancy Probability") +
+  xlab("")
 
  
 
@@ -812,8 +786,9 @@ ggplot(data=fitdf_Year_out) +
   geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
   scale_x_discrete(breaks=unique(fitdf_Year_out$Year),
                    labels=c("2013", "2014", "2015")) +
-  xlab("") +
-  ylab("")
+  ylab("Occupancy Probability") +
+  xlab("")
+
 
 
 ################################################################################
