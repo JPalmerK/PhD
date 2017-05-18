@@ -122,7 +122,6 @@ OccTable_daily=merge(OccTable_daily, mm.unktot, by = c('Date', 'UnitLoc'), all.x
 OccTable_daily[is.na(OccTable_daily)] <- 0
 
 
-
 OccTable_daily$SpeciesOffset=OccTable_daily$BBOcc+OccTable_daily$FBOcc+OccTable_daily$UNKOcc
 OccTable_daily$OccAll=ifelse(OccTable_daily$SpeciesOffset>=1,1,0)
 
