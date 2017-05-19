@@ -594,7 +594,7 @@ OccTable=OccTable[!duplicated(OccTable[,1:3]),]
 # Export the CSV #
 ####################################################################################
 
-   write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')   
+   write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')   
    
    
    
