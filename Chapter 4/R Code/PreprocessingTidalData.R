@@ -14,7 +14,15 @@ library(EMD)
 setwd("W:/KJP PHD/4-Bayesian Habitat Use/R Code")
 
 
-meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 CPOD deployments.csv')
+#meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 CPOD deployments.csv')
+
+meta=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
+meta$Usable.from.date=as.Date(meta$Usable.from.date, "%d/%m/%Y", tz = "GMT")
+meta$Usable.from.date
+meta$Usable.until.date=as.Date(meta$Usable.until.date, "%d/%m/%Y", tz = "GMT")
+meta$Usable.Days=difftime(meta$Usable.until.date, meta$Usable.from.date,units='days')
+meta$Year=substr(meta$Usable.from.date,1,4)
+meta=meta[!is.na(meta$Usable.Days),]
 
 # Remove data for non-recovered units
 meta=meta[meta$Usable.from.date !="",]
@@ -34,11 +42,9 @@ for(ii in 1:nrow(meta)){
   TidalDat$Date=as.Date(TidalDat$DateTime_UTC) 
   TidalDat$Time <- as.numeric(substr(as.character(TidalDat$DateTime_UTC),12,13))
   
-  # Trim the data for each year
-  IDX=which(TidalDat$Date>=as.Date(meta$Usable.from.date[ii], format="%d/%m/%Y") &
-          TidalDat$Date<=as.Date(meta$Usable.until.date[ii], format="%d/%m/%Y"))
-  
-  NewDat=TidalDat[IDX,]
+ 
+  NewDat=TidalDat
+    
   NewDat$Year=as.numeric(format(NewDat$Date, '%Y'))
   NewDat$UnitLoc=meta$UnitLoc[ii]
   
@@ -57,7 +63,7 @@ for(ii in 1:nrow(meta)){
   NewDat$HourAfterHigh[TideExtrema$maxindex[,1]]=0
   idx=1
   
-  while (length(which(is.na(NewDat$HourAfterHigh)))>0 & idx<8){
+  while (length(which(is.na(NewDat$HourAfterHigh)))>0 & idx<7){
     
     # Get the indexes of the NA values plus and minus the tidal height hour
     PosTideVals=TideExtrema$maxindex[,1]+idx
@@ -127,7 +133,11 @@ for(ii in 1:nrow(meta)){
   
  # plot(NewDat$Z, col=NewDat$Phase+1)
 
-  
+  # Trim the data for each year
+  IDX=which(NewDat$Date>=as.Date(meta$Usable.from.date[ii], format="%d/%m/%Y") &
+              NewDat$Date<=as.Date(meta$Usable.until.date[ii], format="%d/%m/%Y"))
+
+  NewDat=NewDat[IDX,]
   
   # Combine data frames
   TidalHeightOut=rbind(NewDat, TidalHeightOut)
@@ -136,6 +146,24 @@ for(ii in 1:nrow(meta)){
   
   print((ii))
   }
+
+
+#########################
+# Sort the NA values
+#########################
+
+NAIdx=which(is.na(TidalHeightOut$HourAfterHigh))
+
+
+for (ii in 1:length(NAIdx)){
+  
+  # Values on either side of the NA idx
+  ADJValues=TidalHeightOut$HourAfterHigh[c(NAIdx[ii]-1,NAIdx[ii]+1)]
+  
+  if (sum(is.na(ADJValues))==0){TidalHeightOut$HourAfterHigh[NAIdx[ii]]=mean(abs(ADJValues))}
+  
+  
+}
 
 
 ##################################################
