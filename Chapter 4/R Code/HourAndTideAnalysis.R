@@ -20,7 +20,7 @@ library(mvtnorm)
 setwd("W:/KJP PHD/4-Bayesian Habitat Use/R Code")
 
 
-OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
+OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
                "Cro_05", "Cro_10", "Cro_15",
@@ -45,6 +45,10 @@ rm(meta_sub)
 
 
 OccTable$IsCroFactor=ifelse(OccTable$UnitLoc=='Cro_05', 'Cro05','Other')
+
+OccTable$TimeofDay='Day'
+OccTable$TimeofDay[OccTable$elevation > -5 & OccTable$elevation < 5]='Crepuscular'
+OccTable$TimeofDay[OccTable$elevation < -5]='Night'
 
 ################################################################################
 # General Data Prep #
@@ -86,6 +90,7 @@ OccTable$BNDTotOffset=(OccTable$BBOcc*.77+OccTable$FBOcc*.06+OccTable$UNKOcc*.5)
 OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=1
 OccTable$Year=as.factor(OccTable$Year)
 OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
+
 
 #####################################################
 # Daily Occupancy #
@@ -323,7 +328,7 @@ CalcAUC<-function(mod, data_sub){
 #                offset = BNDTotOffset,
 #                data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
 # 
-# TideIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh))*HourAfterHigh,
+# TideIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh))*ShoreDist,
 #                 corstr = 'ar1',
 #                 family = binomial, # leave out constrains
 #                 id=GroupId:Date,
@@ -346,7 +351,7 @@ CalcAUC<-function(mod, data_sub){
 #                    data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
 # 
 #  
-#  QIC(empty, TideDl, Tides, TideIntl, TideREGroup, TidesPh, TidesPhInt) #TideIntS
+#  QIC(empty, TideDl, Tides, TideIntl, TideREGroup, TideIntS, TidesPh, TidesPhInt) #TideIntS
 # 
 # # QIC
 # # empty       19746.04
@@ -354,6 +359,7 @@ CalcAUC<-function(mod, data_sub){
 # # Tides       19717.72
 # # TideIntl    19728.36
 # # TideREGroup 19754.79
+# # TideIntS    19731.57
 
 
  
@@ -464,7 +470,6 @@ CalcAUC(mod, data_sub=data)
 #######################################################
 # Julien Date Smoothes #
 #######################################################
-# Get the smoothed index terms using MRSea data
 
 partialDF=function(mod, data, Variable){
   
@@ -576,12 +581,12 @@ ggplot(data=fitdf_Hour) +
   geom_line(aes(HourAfterPeakSolEle, y), size=1) +  
   geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_hour, aes(x=HourAfterPeakSolEle, y=BBOcc)) +
-  geom_rug(data=subset(data_sub, BBOcc==1), 
-           aes(x=jitter(HourAfterPeakSolEle,2), y=OccAll*.1),
-           sides='t', alpha=.8) +
-  geom_rug(data=subset(data_sub, BBOcc==0), 
-           aes(x=jitter(HourAfterPeakSolEle,2), y=OccAll),
-           sides='b', alpha=.8) +
+  # geom_rug(data=subset(data, BBOcc==1), 
+  #          aes(x=jitter(HourAfterPeakSolEle, 2.5), y=BBOcc*.1),
+  #          sides='t', alpha=.8) +
+  # geom_rug(data=subset(data, BBOcc==0), 
+  #          aes(x=jitter(HourAfterPeakSolEle, 2.5), y=BBOcc),
+  #          sides='b', alpha=.8) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Occupancy Probability') 
 
@@ -595,6 +600,13 @@ ggplot(data=fitdf_tide) +
   xlab('Hour After High Tide') +
   ylab('Hour') 
 
+  # geom_rug(data=subset(data, BBOcc==1), 
+  #          aes(x=jitter(HourAfterPeakSolEle,2.5), y=BBOcc*.1),
+  #          sides='t', alpha=.8) +
+  # geom_rug(data=subset(data, BBOcc==0), 
+  #          aes(x=jitter(HourAfterPeakSolEle,2.5), y=BBOcc),
+  #          sides='b', alpha=.8)
+
 # Partial plot for shore dist
 ggplot(data=fitdf_ShoreDist) +
   theme_bw() +
@@ -602,7 +614,14 @@ ggplot(data=fitdf_ShoreDist) +
   scale_x_discrete(breaks=unique(fitdf_ShoreDist$ShoreDist),
                    labels=c("Near", "Mid", "Off")) +
   xlab("") +
-  
+  ylab("")
+
+ggplot(data=fitdf_GroupId) +
+  theme_bw() +
+  geom_boxplot(aes(x=GroupId, y=inv.logit(vals)))+
+  scale_x_discrete(breaks=unique(fitdf_GroupId$GroupId),
+                   labels=unique(data$GroupId)) +
+  xlab("") +
   ylab("")
 
 # # Partial plot for year
@@ -615,33 +634,469 @@ ggplot(data=fitdf_ShoreDist) +
 #   xlab("") +
 #   ylab("")
 
-ggplot(data=fitdf_GroupId) +
-  theme_bw() +
-  geom_boxplot(aes(x=GroupId, y=inv.logit(vals)))+
-  scale_x_discrete(breaks=unique(fitdf_GroupId$GroupId),
-                   labels=unique(data$GroupId)) +
-  xlab("") +
-  ylab("")
+#################################################################################################
+# Repeat the Analysis for the Cromarty 5 location #
+##################################################################################################
+
+# 1 Whether hour of the day, Elevation or Julien Day given elevation is the most important
+# 2 Do the same for tide height- also check factor or continuous
+# 3 Use backwards selection to get the model order
 
 
 
 
+##################################################################################################
+# Exploratory Analysis #
+##################################################################################################
 
+Cro_data=OccTable[OccTable$UnitLoc=='Cro_05',]
+Cro_data=droplevels(Cro_data)
+Cro_data$elevationBin=cut(Cro_data$elevation, breaks = 12, labels = round(seq(min(Cro_data$elevation), max(Cro_data$elevation), length=12)))
+
+aggdata_hour=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle+Year, FUN=mean))
+aggdata_tide=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterHigh+Year, FUN=mean))
+aggdata_elevation=data.frame(aggregate(data=Cro_data, BBOcc~elevationBin+Year, FUN=mean))
+
+ggplot(aggdata_hour, aes(HourAfterPeakSolEle, BBOcc, color=Year))+geom_point()
+ggplot(aggdata_tide, aes(HourAfterHigh, BBOcc, color=Year))+geom_point()
+ggplot(aggdata_elevation, aes(elevationBin, BBOcc, color=Year))+geom_point()
+
+
+
+
+#############################################################################################################################
+# 1) Determine what form hour of day should take (linear offset, interaction or smooth)
+#############################################################################################################################
+
+# An empty model is fitted: the binary response "OccAll" is modelled as a function of year, shore dist and GroupID only. These are expressed as B-splines with
+# one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date"
+# such that within each day the probability of detecting a click depends on whether a click was detected in the previous hour
+
+
+# Also check solar elevation/Julien Day 
+
+empty=geeglm(OccAll ~ Year,
+       corstr = 'ar1',
+       family = binomial, # leave out constrains
+       id=Date,
+       offset = BNDTotOffset,
+       data = Cro_data)
+
+
+## Test linear or smooth for hour of day and with or without an interaction with GroupID
+HoDl=geeglm(OccAll ~Year + HourAfterPeakSolEle,
+       corstr = 'ar1',
+       family = binomial, # leave out constrains
+       id=Date,
+       offset = BNDTotOffset,
+       data = Cro_data)
+
+HoDs=geeglm(OccAll ~Year + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=Date,
+            offset = BNDTotOffset,
+            data = Cro_data)
+
+
+HoDIntL=geeglm(OccAll ~Year*HourAfterPeakSolEle ,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=Date,
+               offset = BNDTotOffset,
+               data = Cro_data)
+
+
+HoDsREYear=geeglm(OccAll ~Year*bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=GroupId:Date,
+            offset = BNDTotOffset,
+            data = Cro_data)
+
+
+## Test linear or smooth for hour of day and with or without an interaction with GroupID
+Elevationl=geeglm(OccAll ~ Year+ elevation,
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=Date,
+            offset = BNDTotOffset,
+            data = Cro_data)
+
+elevations=geeglm(OccAll ~Year + bs(elevation, knots = mean(elevation)),
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=Date,
+            offset = BNDTotOffset,
+            data = Cro_data)
+
+
+elevationIntL=geeglm(OccAll ~Year*elevation ,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=Date,
+               offset = BNDTotOffset,
+               data = Cro_data)
+
+
+elevationsREYear=geeglm(OccAll ~Year*bs(elevation, knots = mean(elevation)),
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=GroupId:Date,
+                  offset = BNDTotOffset,
+                  data = Cro_data)
+
+
+## Test linear for julien day 
+JulienDayl=geeglm(OccAll ~ Year+ JulienDay,
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=Date,
+                  offset = BNDTotOffset,
+                  data = Cro_data)
+
+JulienDays=geeglm(OccAll ~Year + bs(JulienDay, knots = mean(JulienDay)),
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=Date,
+                  offset = BNDTotOffset,
+                  data = Cro_data)
+
+
+JulienDayIntL=geeglm(OccAll ~Year*JulienDay ,
+                     corstr = 'ar1',
+                     family = binomial, # leave out constrains
+                     id=Date,
+                     offset = BNDTotOffset,
+                     data = Cro_data)
+
+
+JulienDaysREYear=geeglm(OccAll ~Year*bs(JulienDay, knots = mean(JulienDay)) + bs(elevation, knots = mean(elevation)),
+                        corstr = 'ar1',
+                        family = binomial, # leave out constrains
+                        id=Date,
+                        offset = BNDTotOffset,
+                        data = Cro_data)
+
+# Interactions between julien day and year 
+
+JulienDayIntYear=geeglm(OccAll ~Year:bs(JulienDay, knots = mean(JulienDay)),
+       corstr = 'ar1',
+       family = binomial, # leave out constrains
+       id=Date,
+       offset = BNDTotOffset,
+       data = Cro_data)
+
+JulienDayIntElevation=geeglm(OccAll ~elevation*bs(JulienDay, knots = mean(JulienDay)),
+       corstr = 'ar1',
+       family = binomial, # leave out constrains
+       id=Date,
+       offset = BNDTotOffset,
+       data = Cro_data)
+
+ElevationIntJulienDay=geeglm(OccAll ~JulienDay*bs(elevation, knots = mean(elevation)),
+       corstr = 'ar1',
+       family = binomial, # leave out constrains
+       id=Date,
+       offset = BNDTotOffset,
+       data = Cro_data)
+
+# Combine Elevation and Julien Day of Year
+YearIntJdateLelevation= geeglm(OccAll ~Year*bs(JulienDay, knots = mean(JulienDay))+ bs(elevation, knots = mean(elevation)),
+           corstr = 'ar1',
+           family = binomial, # leave out constrains
+           id=Date,
+           offset = BNDTotOffset,
+           data = Cro_data)
+
+YearJdateLelevation= geeglm(OccAll ~Year+bs(JulienDay, knots = mean(JulienDay))+ bs(elevation, knots = mean(elevation)),
+     corstr = 'ar1',
+      family = binomial, # leave out constrains
+      id=Date,
+      offset = BNDTotOffset,
+      data = Cro_data)
+
+YearIntJdateSHour=geeglm(OccAll ~Year*bs(JulienDay, knots = mean(JulienDay))+ bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+        corstr = 'ar1',
+        family = binomial, # leave out constrains
+        id=Date,
+        offset = BNDTotOffset,
+        data = Cro_data)
+
+YearJdateSHourS=geeglm(OccAll ~Year+bs(JulienDay, knots = mean(JulienDay))+ bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+           corstr = 'ar1',
+           family = binomial, # leave out constrains
+           id=Date,
+           offset = BNDTotOffset,
+           data = Cro_data)
+
+QIC(empty, HoDl, HoDs, HoDIntL, HoDsREYear,
+    Elevationl, elevations, elevationIntL, elevationsREYear,
+    JulienDayl, JulienDays, JulienDayIntL,JulienDaysREYear,
+    JulienDayIntYear, JulienDayIntElevation, ElevationIntJulienDay,
+    YearIntJdateLelevation, YearJdateLelevation, YearIntJdateSHour, YearJdateSHourS)
+
+
+# QIC
+# empty                  5760
+# HoDl                   5757
+# HoDs                   5750
+# HoDIntL                5759
+# HoDsREYear             5757
+# Elevationl             5743
+# elevations             5738
+# elevationIntL          5744
+# elevationsREYear       5739
+# JulienDayl             5750
+# JulienDays             5709
+# JulienDayIntL          5750
+# JulienDaysREYear       5701
+# JulienDayIntYear       5704
+# JulienDayIntElevation  5708
+# ElevationIntJulienDay  5733
+# YearIntJdateLelevation 5701
+# YearJdateLelevation    5706
+# YearIntJdateSHour      5695 # winner still regardless of whether all cromarty or just DPD used
+# YearJdateSHourS        5699 
+
+
+# #############################################################################################################################
+# # 2) Determine what form hour/solar elevation should take (linear offset, interaction or smooth)
+# #############################################################################################################################
+
+# Test linear or smooth for hour of day and with or without an interaction with GroupID
+HodDl=geeglm(OccAll ~HourAfterHigh,
+              corstr = 'ar1',
+              family = binomial, # leave out constrains
+              id=Date,
+              offset = BNDTotOffset,
+              data = Cro_data) #5906 
+
+
+HodS=geeglm(OccAll ~ bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+             corstr = 'ar1',
+             family = binomial, # leave out constrains
+             id=Date,
+             offset = BNDTotOffset,
+             data =Cro_data) #5903
+
+ElevationL=geeglm(OccAll ~ elevation,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=Date,
+               offset = BNDTotOffset,
+               data = Cro_data) #5883 
+
+ElevationLS=geeglm(OccAll ~ bs(elevation, knots=median(elevation)),
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=Date,
+                  offset = BNDTotOffset,
+                  data = Cro_data) # 5878
+
+# Solar elevation or julien day?- Julien Day
+
+JdayS=geeglm(OccAll ~ bs(JulienDay, knots=median(JulienDay)),
+                   corstr = 'ar1',
+                   family = binomial, # leave out constrains
+                   id=Date,
+                   offset = BNDTotOffset,
+                   data = Cro_data) # 5829 
+
+# Julien day AND elevation?
+
+JdayAndElevation=geeglm(OccAll ~ bs(JulienDay, knots=median(JulienDay))+bs(elevation, knots=median(elevation)),
+                        corstr = 'ar1',
+                        family = binomial, # leave out constrains
+                        id=Date,
+                        offset = BNDTotOffset,
+                        data = Cro_data) #5826
+# #############################################################################################################################
+# # 3) Determine what form tidal phase should take (linear offset, interaction or smooth)
+# #############################################################################################################################
+
+# Test linear or smooth for hour of day and with or without an interaction with GroupID
+TideDl=geeglm(OccAll ~Year+ HourAfterHigh,
+              corstr = 'ar1',
+              family = binomial, # leave out constrains
+              id=Date,
+              offset = BNDTotOffset,
+              data = Cro_data)
+
+Tides=geeglm(OccAll ~Year+ bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+             corstr = 'ar1',
+             family = binomial, # leave out constrains
+             id=Date,
+             offset = BNDTotOffset,
+             data =Cro_data)
+
+TidesPh=geeglm(OccAll ~Year+ Phase,
+              corstr = 'ar1',
+              family = binomial, # leave out constrains
+              id=Date,
+              offset = BNDTotOffset,
+              data = Cro_data)
+
+TidesPhiNT=geeglm(OccAll ~Year*Phase,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=Date,
+               offset = BNDTotOffset,
+               data = Cro_data)
+
+
+
+
+ QIC(empty, TideDl, Tides, TidesPh, TidesPhiNT) 
+
+ # QIC
+ # empty      5900
+ # TideDl     5898 
+ # Tides      5894 # winner
+ # TidesPh    5896
+ # TidesPhiNT 5895
+ 
+#########################################################################################################################
+## 3 Use backwards selection to get the model order ##
+#########################################################################################################################
+ 
+ # Full Model
+ fullMod=geeglm(OccAll ~ bs(JulienDay, knots=median(JulienDay))+
+                  bs(elevation, knots=median(elevation))+
+                  bs(HourAfterHigh, knots = mean(HourAfterHigh))+Year,
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=Date,
+                  offset = BNDTotOffset,
+                  data = Cro_data) # 5817
+ 
+ # knock out Hour After High (2)
+ fullMod_tide=geeglm(OccAll ~ bs(JulienDay, knots=median(JulienDay))+
+                     bs(elevation, knots=median(elevation))+Year,
+                     corstr = 'ar1',
+                     family = binomial, # leave out constrains
+                     id=Date,
+                     offset = BNDTotOffset,
+                     data = Cro_data) #5823 
+ 
+ # knock out Solar Elevation (3)
+ fullMod_hour=geeglm(OccAll ~ bs(JulienDay, knots=median(JulienDay))+
+                       bs(HourAfterHigh, knots = mean(HourAfterHigh))+Year,
+                corstr = 'ar1',
+                family = binomial, # leave out constrains
+                id=Date,
+                offset = BNDTotOffset,
+                data = Cro_data) #5821  
+ 
+ # Knock out  Julien Day (1)
+ fullMod_day=geeglm(OccAll ~
+                      bs(elevation, knots=median(elevation))+
+                      bs(HourAfterHigh, knots = mean(HourAfterHigh))+Year,
+                corstr = 'ar1',
+                family = binomial, # leave out constrains
+                id=Date,
+                offset = BNDTotOffset,
+                data = Cro_data) #5866  
+ 
+ # Knock out Year (4)
+ fullMod_year=geeglm(OccAll ~bs(JulienDay, knots=median(JulienDay))+
+                       bs(elevation, knots=median(elevation))+
+                       bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+                corstr = 'ar1',
+                family = binomial, # leave out constrains
+                id=Date,
+                offset = BNDTotOffset,
+                data = Cro_data) #5819 
+ 
+
+
+ CroMod=geeglm(OccAll ~Year+bs(JulienDay, knots = mean(JulienDay))+
+                 bs(HourAfterHigh, knots = mean(HourAfterHigh))+
+                 bs(elevation, knots=median(elevation))+Year,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=Date,
+               offset = BNDTotOffset,
+               data = Cro_data) # 5685.773
+ 
+ 
+ #####################################################################################################################
+ # Explore AUC values #
+ #####################################################################################################################
+
+ CalcAUC(mod=CroMod, data_sub=Cro_data)
+ 
+ 
+ ##############################################################################################################
+ # Create the Partial Plots #
+ ##############################################################################################################
+ 
+ 
+ # Aggregate the data for plotting
+ aggdata_hour=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle, FUN=function(x){mean(x)/2}))
+ aggdata_tide=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterHigh, FUN=function(x){mean(x)/6}))
+ aggdata_tide$Nobs=aggregate(data=Cro_data, UnitLoc~HourAfterHigh, FUN=length)[2]
+ aggdata_elevation=data.frame(aggregate(data=Cro_data, BBOcc~elevationBin, FUN=function(x){mean(x)}))
+
+ 
+ aggdata_GroupId=data.frame(aggregate(data=Cro_data, BBOcc~GroupId, FUN=mean))
+ 
+ 
+ #######################################################
+ # Julien Date Smoothes #
+ #######################################################
+ 
+
+ fitdf_tide=partialDF(CroMod, Cro_data, 'HourAfterHigh')
+ fitdf_Year=partialdf_factor(CroMod, Cro_data, 'Year')
+ fitdf_jdate=partialDF(CroMod, Cro_data, 'JulienDay')
+ fitdf_ele=partialDF(CroMod, Cro_data,'elevation')
+ 
+ ggplot(data=fitdf_tide) +
+   theme_bw()+
+   scale_colour_manual(values=cbbPalette) +
+   geom_line(aes(HourAfterHigh, logit(y)), size=1) +  
+   geom_ribbon(aes(x=HourAfterHigh, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
+   geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=logit(BBOcc))) +
+   xlab('Hour Relative High Tide') +
+   ylab('Hour')
+ 
+ ggplot(data=fitdf_jdate) +
+   theme_bw()+
+   scale_colour_manual(values=cbbPalette) +
+   geom_line(aes(JulienDay, logit(y)), size=1) +  
+   geom_ribbon(aes(x=JulienDay, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
+   #geom_point(data=aggdata_tide, aes(x=JulienDay, y=BBOcc)) +
+   xlab('Hour Relative High Tide') +
+   ylab('Hour')
+ 
+ ggplot(data=fitdf_ele) +
+   theme_bw()+
+   scale_colour_manual(values=cbbPalette) +
+   geom_line(aes(elevation, y), size=1) +  
+   geom_ribbon(aes(x=elevation, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
+    geom_point(data=aggdata_elevation, aes(x='elevation', y=BBOcc)) +
+   xlab('Hour Relative Solar Noon') +
+   ylab('Hour')
+ 
+ 
+ 
+ 
 ######################################################################################################################
 # Get and plot the fit  #
 ######################################################################################################################
 # data=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
-# 
+#
 # OneYearAggs=data.frame(aggregate(data=subset(data, Year==2013), OccAll~HourAfterPeakSolEle+GroupId+ShoreDist, FUN=mean))
 # AggData=cbind(OneYearAggs, predictvcv(mod, newdata = OneYearAggs))
 # newdata=subset(OccTable_DPD, Year==2013)
 # fit=cbind(newdata,  predictvcv(mod = mod, newdata = newdata))
-# 
-# 
-# 
+#
+#
+#
 # # Color Bline Paette
 # cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-# 
+#
 # # Plot all the data
 # ggplot(data=fit) +
 #   theme_bw() +
@@ -650,10 +1105,10 @@ ggplot(data=fitdf_GroupId) +
 #   geom_line(aes(Hr, inv.logit(fit), colour=ShoreDist), size=1) +
 #   geom_ribbon(aes(x=HourAfterHigh, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
 #               alpha=.2,linetype= 'blank') +
-# 
+#
 #   xlab("") +
 #   ylab("")
-# 
+#
 
 
 

@@ -496,62 +496,63 @@ OccTable=OccTable[!duplicated(OccTable[,1:3]),]
    OccTable= merge.with.order(OccTable, temp, by=c('UnitLoc','Date',  'Hr', 'Year'),
                               sort = T, keep_order=1)
    
-   # Fix Hour after high tide
-   
-  
-   
-   OccTable$yearunitloc=paste(OccTable$Year, OccTable$UnitLoc)
-   OccTable$HourAfterHigh=NA
-
-   for(jj in 1:length(unique(OccTable$yearunitloc))){
-     
-      OccTable_sub=OccTable[OccTable$yearunitloc==unique(OccTable$yearunitloc)[jj],]
-      mm=extrema(OccTable_sub$Z)
-      
-      OccTable_sub$HourAfterHigh=NA
-      #OccTable_sub$HourAfterHigh[mm$minindex[,1]]=mm$minindex[,1]
-      OccTable_sub$HourAfterHigh[mm$maxindex[,1]]=0
-      OccTable_sub[1:length(seq(-mm$maxindex[1,1],-1))]=seq(-mm$maxindex[1,1],-1)
-      
-      kk=1
-      idx=which(OccTable_sub$HourAfterHigh==0)
-      
-      
-      while(sum(is.na(OccTable_sub$HourAfterHigh))>0 & kk<20){
-      
-
-        mtry = try(idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk)
-        if (!inherits(mtry, "try-error")){
-          less1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk
-          OccTable_sub$HourAfterHigh[less1_idx[less1_idx>0 & less1_idx<=nrow(OccTable_sub)]]= -kk
-        }else{
-          print('blarg')
-        }
-        
-        mtry = try(idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk)
-        if (!inherits(mtry, "try-error")){
-          plus1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk
-          OccTable_sub$HourAfterHigh[plus1_idx[plus1_idx>0 & plus1_idx<=nrow(OccTable_sub)]]=  kk
-        }else{
-          print('blarg')
-        }
-         kk=kk+1
-         print(kk)
-
-        # less1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk
-        # plus1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk
-        # 
-        # OccTable_sub$HourAfterHigh[less1_idx[less1_idx>0 & less1_idx<nrow(OccTable_sub)]]= -kk
-        # OccTable_sub$HourAfterHigh[plus1_idx[plus1_idx>0 & plus1_idx<nrow(OccTable_sub)]]=  kk
-        # 
-     
-        
-      }
-      
-      OccTable$HourAfterHigh[OccTable$yearunitloc==unique(OccTable$yearunitloc)[jj]]=OccTable_sub$HourAfterHigh
-      
-      rm(OccTable_sub)
-   }
+   # # Fix Hour after high tide this was fixed in the PreProcessingTidalData.R file 
+   # 19/05/2017 (files on GIT hub)
+   # 
+   # 
+   # 
+   # OccTable$yearunitloc=paste(OccTable$Year, OccTable$UnitLoc)
+   # OccTable$HourAfterHigh=NA
+   # 
+   # for(jj in 1:length(unique(OccTable$yearunitloc))){
+   #   
+   #    OccTable_sub=OccTable[OccTable$yearunitloc==unique(OccTable$yearunitloc)[jj],]
+   #    mm=extrema(OccTable_sub$Z)
+   #    
+   #    OccTable_sub$HourAfterHigh=NA
+   #    #OccTable_sub$HourAfterHigh[mm$minindex[,1]]=mm$minindex[,1]
+   #    OccTable_sub$HourAfterHigh[mm$maxindex[,1]]=0
+   #    OccTable_sub[1:length(seq(-mm$maxindex[1,1],-1))]=seq(-mm$maxindex[1,1],-1)
+   #    
+   #    kk=1
+   #    idx=which(OccTable_sub$HourAfterHigh==0)
+   #    
+   #    
+   #    while(sum(is.na(OccTable_sub$HourAfterHigh))>0 & kk<20){
+   #    
+   # 
+   #      mtry = try(idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk)
+   #      if (!inherits(mtry, "try-error")){
+   #        less1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk
+   #        OccTable_sub$HourAfterHigh[less1_idx[less1_idx>0 & less1_idx<=nrow(OccTable_sub)]]= -kk
+   #      }else{
+   #        print('blarg')
+   #      }
+   #      
+   #      mtry = try(idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk)
+   #      if (!inherits(mtry, "try-error")){
+   #        plus1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk
+   #        OccTable_sub$HourAfterHigh[plus1_idx[plus1_idx>0 & plus1_idx<=nrow(OccTable_sub)]]=  kk
+   #      }else{
+   #        print('blarg')
+   #      }
+   #       kk=kk+1
+   #       print(kk)
+   # 
+   #      # less1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx-kk]))]-kk
+   #      # plus1_idx=idx[which(is.na(OccTable_sub$HourAfterHigh[idx+kk]))]+kk
+   #      # 
+   #      # OccTable_sub$HourAfterHigh[less1_idx[less1_idx>0 & less1_idx<nrow(OccTable_sub)]]= -kk
+   #      # OccTable_sub$HourAfterHigh[plus1_idx[plus1_idx>0 & plus1_idx<nrow(OccTable_sub)]]=  kk
+   #      # 
+   #   
+   #      
+   #    }
+   #    
+   #    OccTable$HourAfterHigh[OccTable$yearunitloc==unique(OccTable$yearunitloc)[jj]]=OccTable_sub$HourAfterHigh
+   #    
+   #    rm(OccTable_sub)
+   # }
 
    
    OccTable$yearunitloc=NULL
