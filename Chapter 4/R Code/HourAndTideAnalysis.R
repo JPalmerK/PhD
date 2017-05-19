@@ -1035,20 +1035,31 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
  
  # Aggregate the data for plotting
  aggdata_hour=data.frame(aggregate(data=Cro_data, OccVals~HourAfterPeakSolEle, FUN=function(x){mean(x)}))
+ 
  aggdata_tide=data.frame(aggregate(data=Cro_data, OccVals~HourAfterHigh, FUN=function(x){mean(x)/3.5}))
  aggdata_tide$Nobs=aggregate(data=Cro_data, UnitLoc~HourAfterHigh, FUN=length)[2]
- aggdata_elevation=data.frame(aggregate(data=Cro_data, OccVals~elevationBin, FUN=function(x){mean(x)}))
- aggdata_jdate=data.frame(aggregate(data=Cro_data, OccVals~JulienDay, FUN=function(x){mean(x)}))
  
+ aggdata_elevation=data.frame(aggregate(data=Cro_data, OccVals~elevationBin, FUN=function(x){mean(x)}))
+ aggdata_elevation$elevationBin=as.numeric(aggdata_elevation$elevationBin)
+ 
+ aggdata_jdate=data.frame(aggregate(data=Cro_data, OccVals~JulienDay, FUN=function(x){mean(x)}))
+ aggdata_jdate$DummyDate=as.Date(aggdata_jdate$JulienDay, origin=as.Date("2013-01-01"))
  
  #######################################################
  # Julien Date Smoothes #
  #######################################################
  
-
+ # Tide
  fitdf_tide=partialDF(CroMod, Cro_data, 'HourAfterHigh')
+ 
+ # Year
  fitdf_Year=partialdf_factor(CroMod, Cro_data, 'Year')
+ 
+ # Julien Day
  fitdf_jdate=partialDF(CroMod, Cro_data, 'JulienDay')
+ fitdf_jdate$DummyDate=as.Date(JulienDay, origin=as.Date("2013-01-01"))
+ 
+ # Solar Elevation
  fitdf_ele=partialDF(CroMod, Cro_data,'elevation')
  
  ggplot(data=fitdf_tide) +
@@ -1056,7 +1067,7 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
    scale_colour_manual(values=cbbPalette) +
    geom_line(aes(HourAfterHigh, logit(y)), size=1) +  
    geom_ribbon(aes(x=HourAfterHigh, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
-   geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=logit(OccVals))) +
+   #geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=logit(OccVals))) +
    xlab('Hour Relative High Tide') +
    ylab('Hour')
  
@@ -1065,7 +1076,7 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
    scale_colour_manual(values=cbbPalette) +
    geom_line(aes(JulienDay, logit(y)), size=1) +  
    geom_ribbon(aes(x=JulienDay, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
-   geom_point(data=aggdata_jdate, aes(x=JulienDay, y=logit(BBOcc)) +
+   #geom_point(data=aggdata_jdate, aes(x=JulienDay, y=logit(BBOcc)) +
    xlab('Julien  Day ') +
    ylab('Hour')
  
@@ -1074,7 +1085,7 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
    scale_colour_manual(values=cbbPalette) +
    geom_line(aes(elevation, y), size=1) +  
    geom_ribbon(aes(x=elevation, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
-    geom_point(data=aggdata_elevation, aes(x='elevation', y=BBOcc)) +
+   #geom_point(data=aggdata_elevation, aes(x='elevationBin', y=OccVals)) +
    xlab('Hour Relative Solar Noon') +
    ylab('Hour')
  
