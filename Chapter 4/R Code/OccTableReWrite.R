@@ -142,10 +142,10 @@ merge.with.order <- function(x,y, ..., sort = T, keep_order)
 # Load Deployment Info and Processed Train Data #
 #########################################################################################################
 
-#Only CPOD info
-DepInfo=read.csv('W:/KJP PHD/Deployment Information/Copy of Marine Scotland 2013-14 CPOD summary data (2).csv')
-
-PdetInfo=read.csv('W:/KJP PHD/4-Bayesian Habitat Use/Pdet at Time/MaxPdet.csv')
+# #Only CPOD info
+# DepInfo=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
+# 
+# PdetInfo=read.csv('W:/KJP PHD/4-Bayesian Habitat Use/Pdet at Time/MaxPdet.csv')
 
 
 Trains2013=read.csv("W:/KJP PHD/4-Bayesian Habitat Use/DolCPODFiles/2013_ClickTrainAnalysis.csv")
@@ -588,13 +588,30 @@ OccTable=OccTable[!duplicated(OccTable[,1:3]),]
    rm(idx, aa, peaksolar)
    
 ###########################################################################################
+# Add Slope2 and Aspect Values #
+#############################################################################################
+
+   meta2=read.csv('W:/KJP PHD/Deployment Information/SlopeAndAspect.csv')
+   colnames(meta2)[1]='UnitLoc'
+   meta2=meta2[, c('UnitLoc', 'Slope2', 'Aspect')]
+   meta2$UnitLoc[meta2$UnitLoc=='Abr_05']='Arb_05'
+   meta2$UnitLoc[meta2$UnitLoc=='Abr_10']='Arb_10'
+   meta2$UnitLoc[meta2$UnitLoc=='Abr_15']='Arb_15'
+   
+   meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
+   
 
    
+   # OccTable1=merge(OccTable, meta2, by=c('UnitLoc'), all.x=T)
+   
+   OccTable= merge.with.order(OccTable, meta2, by=c('UnitLoc'),
+                              sort = T, keep_order=1)
+ 
 ####################################################################################
 # Export the CSV #
 ####################################################################################
 
-   write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')   
+  write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')   
    
    
    
