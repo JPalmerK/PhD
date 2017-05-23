@@ -90,7 +90,7 @@ CalcAUC<-function(mod, data_sub){
   pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
   pred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
-  plot(perf, colorize=TRUE), print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
+  plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
   
   # Choice of the best cut-off probability
@@ -399,6 +399,57 @@ ModelTable$Abs=0
 # list to store the models #
 modlist=list()
 
+# Function for backwards stepwise selection
+SelectModel=function(ModelFull){
+  
+  # Calculate the QIC of the full model
+  fullmodQ=QIC(ModelFull)
+  newQIC=0
+  
+  
+  while(newQIC != fullmodQ){
+  
+  # get all the terms for the full model
+  terms <- attr(ModelFull$terms,"term.labels")
+  n=length(terms)
+  
+  newmodel=list()
+  newQIC=list()
+  
+  newmodel[[1]]=ModelFull
+  newQIC[[1]]=fullmodQ
+  
+  # Make n models with selection
+  for (ii in 1:n){
+    dropvar=terms[ii]
+    newTerms <- terms[-match(dropvar,terms)]
+    newform <- as.formula(paste(".~.-",dropvar))
+    newmodel[[ii+1]] <- update(ModelFull,newform)
+    newQIC[[ii+1]] =QIC(newmodel[[ii]])
+    
+  }
+  
+  # Get the model with the lowest QIC
+  LowestMod=which.min(unlist(newQIC))
+  
+  if (LowestMod != 1){
+    ModelFull=newmodel[[LowestMod]]
+    newQIC=min(unlist(newQIC))
+  } else {
+    ModelFull=ModelFull
+    newQIC=min(unlist(newQIC))
+  }
+  #end the model selection
+
+
+    }
+  return(ModelFull)
+
+  }
+
+
+# Model selection for ten variables
+
 for(ii in 1:10){
     data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
     data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
@@ -488,63 +539,92 @@ for(ii in 1:10){
       JdateForm='JulienDay'
     }
     
-    # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
-    # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-    mod1=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub) 
+    #############################################################################################
+    # Fit the Models and do backwards AIC  #
+    #############################################################################################
     
-    mod2=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist')), 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)   
-    
-    mod3=geeglm(as.formula(paste('OccAll~', JdateForm,'+ Year')), 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    
-    mod4=geeglm(OccAll~ShoreDist+Year, 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
 
-    
-    # Also compare model with linear smooth
-    
-    Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
-    Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' , JdateForm)
-    Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-    
-    gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-                              Qicdf$Varnames[2], '+',
-                              Qicdf$Varnames[3]))
     if(ii==6 |ii==5|ii==7){
-      modlist[[ii]]=geeglm(formula = gee_form,
-                           corstr = 'independence',
-                           offset = BNDTotOffset,
-                           family = binomial,
-                           id     = UnitLoc,
-                           data   = data_sub)
+      ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+                       corstr = 'independence', 
+                       offset = BNDTotOffset, 
+                       family = binomial, 
+                       id     = UnitLoc, 
+                       data   = data_sub)
     }else{
-      modlist[[ii]]=geeglm(formula = gee_form, 
+      ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
                            corstr = 'ar1', 
                            offset = BNDTotOffset, 
                            family = binomial, 
                            id     = UnitLoc, 
                            data   = data_sub)
-      }
+    }
+
+
     
+    modlist[[ii]]=SelectModel(ModelFull)
+    
+    
+# 
+#     
+#     
+#     # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
+#     # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
+#     mod1=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+#                 corstr = 'ar1', 
+#                 offset = BNDTotOffset, 
+#                 family = binomial, 
+#                 id     = UnitLoc, 
+#                 data   = data_sub) 
+#     
+#     mod2=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist')), 
+#                 corstr = 'ar1', 
+#                 offset = BNDTotOffset, 
+#                 family = binomial, 
+#                 id     = UnitLoc, 
+#                 data   = data_sub)   
+#     
+#     mod3=geeglm(as.formula(paste('OccAll~', JdateForm,'+ Year')), 
+#                 corstr = 'ar1', 
+#                 offset = BNDTotOffset, 
+#                 family = binomial, 
+#                 id     = UnitLoc, 
+#                 data   = data_sub)
+#     
+#     mod4=geeglm(OccAll~ShoreDist+Year, 
+#                 corstr = 'ar1', 
+#                 offset = BNDTotOffset, 
+#                 family = binomial, 
+#                 id     = UnitLoc, 
+#                 data   = data_sub)
+# 
+#     
+#     # Also compare model with linear smooth
+#     
+#     Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
+#     Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
+#     Qicdf$Varnames=c('All',  'Year', 'ShoreDist' , JdateForm)
+#     Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
+#     
+#     gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
+#                               Qicdf$Varnames[2], '+',
+#                               Qicdf$Varnames[3]))
+#     if(ii==6 |ii==5|ii==7){
+#       modlist[[ii]]=geeglm(formula = gee_form,
+#                            corstr = 'independence',
+#                            offset = BNDTotOffset,
+#                            family = binomial,
+#                            id     = UnitLoc,
+#                            data   = data_sub)
+#     }else{
+#       modlist[[ii]]=geeglm(formula = gee_form, 
+#                            corstr = 'ar1', 
+#                            offset = BNDTotOffset, 
+#                            family = binomial, 
+#                            id     = UnitLoc, 
+#                            data   = data_sub)
+#       }
+#     
     # Aggregate data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
                                                       BBOcc~DayBin+GroupId+ShoreDist, FUN=mean))
@@ -558,6 +638,8 @@ for(ii in 1:10){
     
     
     colnames(OneYearAggs)[5]=c('med')
+    colnames(OneYearAggs)[4]='OccAll'
+    
     OneYearAggs$JulienDay=OneYearAggs$med
     OneYearAggs$Year=unique(newdat_perdOnly$Year)
     
@@ -585,7 +667,6 @@ for(ii in 1:10){
   ModelTable$Pres[ii]=AUCvals[2]
   ModelTable$Abs[ii]=AUCvals[3]
 
-  rm(mod1,mod2, mod3, mod4, Qicdf)
 }
 
 
