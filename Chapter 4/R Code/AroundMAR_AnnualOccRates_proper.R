@@ -564,68 +564,7 @@ for(ii in 1:10){
     
     modlist[[ii]]=SelectModel(ModelFull)
     
-    
-# 
-#     
-#     
-#     # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
-#     # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-#     mod1=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-#                 corstr = 'ar1', 
-#                 offset = BNDTotOffset, 
-#                 family = binomial, 
-#                 id     = UnitLoc, 
-#                 data   = data_sub) 
-#     
-#     mod2=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist')), 
-#                 corstr = 'ar1', 
-#                 offset = BNDTotOffset, 
-#                 family = binomial, 
-#                 id     = UnitLoc, 
-#                 data   = data_sub)   
-#     
-#     mod3=geeglm(as.formula(paste('OccAll~', JdateForm,'+ Year')), 
-#                 corstr = 'ar1', 
-#                 offset = BNDTotOffset, 
-#                 family = binomial, 
-#                 id     = UnitLoc, 
-#                 data   = data_sub)
-#     
-#     mod4=geeglm(OccAll~ShoreDist+Year, 
-#                 corstr = 'ar1', 
-#                 offset = BNDTotOffset, 
-#                 family = binomial, 
-#                 id     = UnitLoc, 
-#                 data   = data_sub)
-# 
-#     
-#     # Also compare model with linear smooth
-#     
-#     Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
-#     Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-#     Qicdf$Varnames=c('All',  'Year', 'ShoreDist' , JdateForm)
-#     Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
-#     
-#     gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
-#                               Qicdf$Varnames[2], '+',
-#                               Qicdf$Varnames[3]))
-#     if(ii==6 |ii==5|ii==7){
-#       modlist[[ii]]=geeglm(formula = gee_form,
-#                            corstr = 'independence',
-#                            offset = BNDTotOffset,
-#                            family = binomial,
-#                            id     = UnitLoc,
-#                            data   = data_sub)
-#     }else{
-#       modlist[[ii]]=geeglm(formula = gee_form, 
-#                            corstr = 'ar1', 
-#                            offset = BNDTotOffset, 
-#                            family = binomial, 
-#                            id     = UnitLoc, 
-#                            data   = data_sub)
-#       }
-#     
-    # Aggregate data for plotting
+    # Create Aggregated data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
                                                       BBOcc~DayBin+GroupId+ShoreDist, FUN=mean))
     OneYearAggs=cbind(OneYearAggs,
