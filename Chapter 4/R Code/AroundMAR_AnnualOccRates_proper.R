@@ -47,26 +47,12 @@ OccTable$ShoreDist[OccTable$ShoreDist=="5"]='05'
 OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
 
 OccTable$Year=as.factor(OccTable$Year)
-DepInfo=read.csv('W:/KJP PHD/Deployment Information/Copy of Marine Scotland 2013-14 CPOD summary data (2).csv')
-
-meta=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
+meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
 meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
 
-meta2=read.csv('W:/KJP PHD/Deployment Information/SlopeAndAspect.csv')
-colnames(meta2)[1]='UnitLoc'
-
-
-levels(meta2$UnitLoc)[match("Arb_05",levels(meta2$UnitLoc))]  <- "Abr_05"
-levels(meta2$UnitLoc)[match("Arb_10",levels(meta2$UnitLoc))]  <- "Abr_10"
-levels(meta2$UnitLoc)[match("Arb_15",levels(meta2$UnitLoc))]  <- "Abr_15"
-
-
-meta2=meta2[, c('UnitLoc', 'Slope2', 'Aspect')]
-
-
-meta=merge(meta, meta2, by = c('UnitLoc'), all.x = T)
-
-meta_sub=subset(meta, select=c('UnitLoc', 'Slope', 'Slope2', 'Aspect'))
+meta_sub=subset(meta, select=c('UnitLoc', 'Slope'))
+OccTable=merge(OccTable, meta_sub, all.x = TRUE)
+rm(meta_sub)
 
 
 ################################################################################
@@ -78,10 +64,10 @@ meta_sub=subset(meta, select=c('UnitLoc', 'Slope', 'Slope2', 'Aspect'))
 
 CalcAUC<-function(mod, data_sub){
   
-  pr <- predict(mod,data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  pred <- prediction(pr,data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
+  pred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
-  plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
+  plot(perf, colorize=TRUE), print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
   
   # Choice of the best cut-off probability
@@ -251,22 +237,6 @@ ggplot(data=mm, aes(x=med, y=BBOcc, color=ShoreDist)) +
   ggtitle('BND Occupancy')
 
 
-# Investigate relatiohsip between Shore distance and slope
-meta$ShoreDist=substr(meta$UnitLoc, 5,6)
-model.lm <- lm(Slope2 ~ ShoreDist, data = meta)
-summary(model.lm)
-
-cor(meta$Slope2, model.lm$fitted)
-
-# Visualise the relathionship between shore distance and slope
-plot(x = model.lm$fitted, y = meta$Slope2,
-     xlab = "Fitted slope", ylab = "Observed slope")
-abline(lm(meta$Slope2 ~ model.lm$fitted), col="red")
-
-# Also investigate relationship using Anova 
-model.aov <- aov(Slope ~ ShoreDist, data = meta)
-summary(model.aov)
-
 #################################################################################
 # Table For Number of Detections at Each Unit Loc #
 #################################################################################
@@ -387,113 +357,9 @@ OccTable_daily_wDetections= OccTable_daily[OccTable_daily$YrUnitLoc %in%
 
 OccTable_daily_wDetections=droplevels(OccTable_daily_wDetections)
 
-OccTable_daily_wDetections=merge(OccTable_daily_wDetections, meta2, by=c('UnitLoc'))
-
-
-#################################################################################
-# Determine whether Slope or Shore Distance #
-#################################################################################
-
-empty=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay)), 
-             corstr = 'ar1', 
-             offset = BNDTotOffset, 
-             family = binomial, 
-             id     = UnitLoc, 
-             data   = OccTable_daily_wDetections) 
-
-SlopeLinear=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+Slope2, 
-                   corstr = 'ar1', 
-                   offset = BNDTotOffset, 
-                   family = binomial, 
-                   id     = UnitLoc, 
-                   data   = OccTable_daily_wDetections) 
-
-SlopeSpline=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+bs(Slope2, knots=mean(Slope2)), 
-                   corstr = 'ar1', 
-                   offset = BNDTotOffset, 
-                   family = binomial, 
-                   id     = UnitLoc, 
-                   data   = OccTable_daily_wDetections) 
-
-ShoreDist=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+ShoreDist, 
-                 corstr = 'ar1', 
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 id     = UnitLoc, 
-                 data   = OccTable_daily_wDetections) 
-
-QIC(empty, SlopeLinear, ShoreDist, SlopeSpline)
-
-# QIC
-# empty       1.62e+33
-# SlopeLinear 6.03e+03 
-# ShoreDist   6.97e+03
-# SlopeSpline 5.982# winner
-
-
-
-
-#############################################################################################
-mod1.full=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay)) +
-                   bs(Slope2, knots=mean(Slope2)) +
-                   GroupId + 
-                   Year, 
-                  corstr = 'ar1', 
-                  offset = BNDTotOffset, 
-                  family = binomial, 
-                  id     = UnitLoc, 
-                  data   = OccTable_daily_wDetections)
-
-mod1.year=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay)) +
-                   bs(Slope2, knots=mean(Slope2)) +
-                   GroupId , 
-                 corstr = 'ar1', 
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 id     = UnitLoc, 
-                 data   = OccTable_daily_wDetections)
-
-mod1.group=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay)) +
-                   bs(Slope2, knots=mean(Slope2)) +
-                   Year, 
-                 corstr = 'ar1', 
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 id     = UnitLoc, 
-                 data   = OccTable_daily_wDetections)
-
-mod1.slope=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay)) +
-                   GroupId + 
-                   Year, 
-                 corstr = 'ar1', 
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 id     = UnitLoc, 
-                 data   = OccTable_daily_wDetections)
-mod1.jday=geeglm(OccAll~
-                   bs(Slope2, knots=mean(Slope2)) +
-                   GroupId + 
-                   Year, 
-                 corstr = 'ar1', 
-                 offset = BNDTotOffset, 
-                 family = binomial, 
-                 id     = UnitLoc, 
-                 data   = OccTable_daily_wDetections)
-
-QIC(mod1.jday, mod1.slope, mod1.group, mod1.year, mod1.full)
-
-# QIC
-# mod1.jday  5772
-# mod1.slope 6661
-# mod1.group 5984
-# mod1.year  5793
-# mod1.full  5789 -keep all
-
-##############################################################################################
-
 # Table to store model performance #
 ModelTable=data.frame(DeplotymentLoc=unique(OccTable$GroupId))
-ModelTable$ModelFormula='dunno'
+ModelTable$ModelFormula='none'
 ModelTable$Data2013='none'
 ModelTable$Data2014='none'
 ModelTable$Data2015='none'
@@ -522,13 +388,11 @@ for(ii in 1:10){
     ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
     ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
   
-    newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll',
-                                     'Year', 'Slope2'))
+    newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
     newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
                                 OccAll=0,
                                 ShoreDist=unique(newdat$ShoreDist),
                                 GroupId=unique(newdat$GroupId),
-                                Slope2=seq(min(newdat$Slope2), max(newdat$Slope2)),
                                 Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
     
     
@@ -542,62 +406,125 @@ for(ii in 1:10){
     tryCatch({
       ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
     
+    ##########################################################################################
+    # First determine whether linear model or spline for Julien Day #
+    #########################################################################################
     
+    null=geeglm(OccAll~ShoreDist+Year, 
+                         corstr = 'ar1', 
+                         offset = BNDTotOffset, 
+                         family = binomial, 
+                         id     = UnitLoc, 
+                         data   = data_sub) 
     
-    # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
-    # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
-    mod1=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+bs(Slope2, knots=mean(Slope2))+Year, 
+    mod1=geeglm(OccAll~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)), 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
-    mod2=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+bs(Slope2, knots=median(Slope2)), 
+    mod2=geeglm(OccAll~ShoreDist+Year+JulienDay, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    QICvals=QIC(null, mod1, mod2)
+    
+    if (sum(QICvals>10e+15)>2){
+   
+    null=geeglm(OccAll~ShoreDist, 
+                  corstr = 'ar1', 
+                  offset = BNDTotOffset, 
+                  family = binomial, 
+                  id     = UnitLoc, 
+                  data   = data_sub) 
+    
+    mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    mod2=geeglm(OccAll~ShoreDist+JulienDay, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    QICvals=QIC(null, mod1, mod2)}
+    
+    JdateForm=which.min(QICvals[2:3,1]-QICvals[1,1])
+    if(JdateForm==1){
+      JdateForm='bs(JulienDay, knots = mean(JulienDay))'
+    }else{
+      JdateForm='JulienDay'
+    }
+    
+    # At this point, the resulting model is fitted using the library geeglm. The order in which the covariates enter the model is determined by the QIC score
+    # (the ones that, if removed, determine the biggest increase in QIC enter the model first). # Pilfered from Priotta Sperm Whales 
+    mod1=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    mod2=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist')), 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub)   
-    mod3=geeglm(OccAll~bs(JulienDay, knots = mean(JulienDay))+Year, 
-                corstr = 'ar1', 
-                offset = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    mod4=geeglm(OccAll~bs(Slope2, knots=mean(Slope2))+Year, 
+    
+    mod3=geeglm(as.formula(paste('OccAll~', JdateForm,'+ Year')), 
                 corstr = 'ar1', 
                 offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub)
     
+    mod4=geeglm(OccAll~ShoreDist+Year, 
+                corstr = 'ar1', 
+                offset = BNDTotOffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)
+
+    
+    # Also compare model with linear smooth
+    
     Qicdf=data.frame(QIC(mod1, mod2, mod3, mod4))
     Qicdf$deltaQIC=abs(Qicdf$QIC-Qicdf$QIC[1])
-    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' ,'bs(JulienDay, knots = mean(JulienDay))')
+    Qicdf$Varnames=c('All',  'Year', 'ShoreDist' , JdateForm)
     Qicdf=Qicdf[order(Qicdf$deltaQIC,decreasing = TRUE),]
     
     gee_form=as.formula(paste('OccAll~', Qicdf$Varnames[1], '+',
                               Qicdf$Varnames[2], '+',
                               Qicdf$Varnames[3]))
     if(ii==6 |ii==5|ii==7){
-      modlist[[ii]]=geeglm(formula = gee_form, 
-                           corstr = 'independence', 
-                           offset = BNDTotOffset, 
-                           family = binomial, 
-                           id     = UnitLoc, 
-                           data   = data_sub) 
+      modlist[[ii]]=geeglm(formula = gee_form,
+                           corstr = 'independence',
+                           offset = BNDTotOffset,
+                           family = binomial,
+                           id     = UnitLoc,
+                           data   = data_sub)
     }else{
       modlist[[ii]]=geeglm(formula = gee_form, 
                            corstr = 'ar1', 
                            offset = BNDTotOffset, 
                            family = binomial, 
                            id     = UnitLoc, 
-                           data   = data_sub)}
+                           data   = data_sub)
+      }
     
     # Aggregate data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
-                                                      OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
+                                                      BBOcc~DayBin+GroupId+ShoreDist, FUN=mean))
     OneYearAggs=cbind(OneYearAggs,
                       aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)), 
                                 JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
@@ -635,8 +562,11 @@ for(ii in 1:10){
   ModelTable$Pres[ii]=AUCvals[2]
   ModelTable$Abs[ii]=AUCvals[3]
 
-rm(mod1,mod2, mod3, mod4, Qicdf)
+  rm(mod1,mod2, mod3, mod4, Qicdf)
 }
+
+
+
 
 
 # Add dummy dates for plotting (to fix the X axis)
@@ -796,7 +726,7 @@ for(ii in 1:10){
   #######################################################
   fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   
-  fitdf_jdate$DummyDate=as.Date(JulienDay, origin=as.Date("2013-01-01"))
+  fitdf_jdate$DummyDate=as.Date(fitdf_jdate$JulienDay, origin=as.Date("2013-01-01"))
   
   
   

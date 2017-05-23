@@ -50,7 +50,6 @@ OccTable$TimeofDay='Day'
 OccTable$TimeofDay[OccTable$elevation > -5 & OccTable$elevation < 5]='Crepuscular'
 OccTable$TimeofDay[OccTable$elevation < -5]='Night'
 
-
 ################################################################################
 # General Data Prep #
 ################################################################################
@@ -417,10 +416,7 @@ CalcAUC<-function(mod, data_sub){
 #            data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])) # 19708.6 (1)
 # 
 # 
-mod=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+ GroupId + 
-             HourAfterHigh + 
-             ShoreDist + 
-             Year,
+mod=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+GroupId+HourAfterHigh+ShoreDist+Year,
            corstr = 'ar1',
            family = binomial, # leave out constrains
            id=GroupId:Date,
@@ -1035,14 +1031,15 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
  # Create the Partial Plots #
  ##############################################################################################################
  
- Cro_data$OccVals=Cro_data$BNDTotOffset*Cro_data$OccAll
  
  # Aggregate the data for plotting
- aggdata_hour=data.frame(aggregate(data=Cro_data, OccVals~HourAfterPeakSolEle, FUN=function(x){mean(x)}))
- aggdata_tide=data.frame(aggregate(data=Cro_data, OccVals~HourAfterHigh, FUN=function(x){mean(x)/3.5}))
+ aggdata_hour=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle, FUN=function(x){mean(x)/2}))
+ aggdata_tide=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterHigh, FUN=function(x){mean(x)/6}))
  aggdata_tide$Nobs=aggregate(data=Cro_data, UnitLoc~HourAfterHigh, FUN=length)[2]
- aggdata_elevation=data.frame(aggregate(data=Cro_data, OccVals~elevationBin, FUN=function(x){mean(x)}))
- aggdata_jdate=data.frame(aggregate(data=Cro_data, OccVals~JulienDay, FUN=function(x){mean(x)}))
+ aggdata_elevation=data.frame(aggregate(data=Cro_data, BBOcc~elevationBin, FUN=function(x){mean(x)}))
+
+ 
+ aggdata_GroupId=data.frame(aggregate(data=Cro_data, BBOcc~GroupId, FUN=mean))
  
  
  #######################################################
@@ -1060,7 +1057,7 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
    scale_colour_manual(values=cbbPalette) +
    geom_line(aes(HourAfterHigh, logit(y)), size=1) +  
    geom_ribbon(aes(x=HourAfterHigh, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
-   geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=logit(OccVals))) +
+   geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=logit(BBOcc))) +
    xlab('Hour Relative High Tide') +
    ylab('Hour')
  
@@ -1069,8 +1066,8 @@ TidesPhiNT=geeglm(OccAll ~Year*Phase,
    scale_colour_manual(values=cbbPalette) +
    geom_line(aes(JulienDay, logit(y)), size=1) +  
    geom_ribbon(aes(x=JulienDay, ymin=logit(LCI), ymax=logit(UCI)),alpha=.2,linetype= 'blank') +
-   geom_point(data=aggdata_jdate, aes(x=JulienDay, y=logit(BBOcc)) +
-   xlab('Julien  Day ') +
+   #geom_point(data=aggdata_tide, aes(x=JulienDay, y=BBOcc)) +
+   xlab('Hour Relative High Tide') +
    ylab('Hour')
  
  ggplot(data=fitdf_ele) +
