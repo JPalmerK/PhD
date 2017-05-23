@@ -448,6 +448,36 @@ SelectModel=function(ModelFull){
   }
 
 
+# Function for walds signficance
+DropVarsWalds=function(ModelFull){
+  library(geeglm)
+  terms <- attr(ModelFull$terms,"term.labels")
+  
+  newmodel=list()
+  newQIC=list()
+  
+  newmodel[[1]]=ModelFull
+  newQIC[[1]]=fullmodQ
+  
+  # Make n models with selection
+  for (ii in 1:n){
+    dropvar=terms[ii]
+    newTerms <- terms[-match(dropvar,terms)]
+    newform <- as.formula(paste(".~.-",dropvar))
+    newmodel[[ii+1]] <- update(ModelFull,newform)
+    newQIC[[ii+1]] =QIC(newmodel[[ii]])
+    
+    # Get the anova values
+    temp=anova(newmodel[[ii+1]])
+    
+    # find p values less than 0.05
+    which(temp$`P(>|Chi|)`<
+    
+  }
+  
+}
+
+
 # Model selection for ten variables
 
 for(ii in 1:10){
@@ -563,6 +593,13 @@ for(ii in 1:10){
 
     
     modlist[[ii]]=SelectModel(ModelFull)
+    
+    
+    
+    
+    
+    
+    
     
     # Create Aggregated data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
