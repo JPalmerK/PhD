@@ -50,7 +50,6 @@ OccTable$TimeofDay='Day'
 OccTable$TimeofDay[OccTable$elevation > -5 & OccTable$elevation < 5]='Crepuscular'
 OccTable$TimeofDay[OccTable$elevation < -5]='Night'
 
-
 ################################################################################
 # General Data Prep #
 ################################################################################
@@ -417,10 +416,7 @@ CalcAUC<-function(mod, data_sub){
 #            data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])) # 19708.6 (1)
 # 
 # 
-mod=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+ GroupId + 
-             HourAfterHigh + 
-             ShoreDist + 
-             Year,
+mod=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+GroupId+HourAfterHigh+ShoreDist+Year,
            corstr = 'ar1',
            family = binomial, # leave out constrains
            id=GroupId:Date,
