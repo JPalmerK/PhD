@@ -50,11 +50,34 @@ OccTable$Year=as.factor(OccTable$Year)
 meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
 meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
 
-meta_sub=subset(meta, select=c('UnitLoc', 'Slope'))
+
+
+meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
+meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
+
+meta=merge(meta, meta2, by='UnitLoc', all.x = TRUE)
+colnames(meta)[26]='Slope'
+
+meta_sub=subset(meta, select=c('UnitLoc', 'Slope2'))
+
 OccTable=merge(OccTable, meta_sub, all.x = TRUE)
-rm(meta_sub)
 
+###############################################################################
+# Investigate colinearity between Shore Distance and Slope
+###############################################################################
+meta$ShoreDist=substr(meta$UnitLoc,5,6)
 
+boxplot(meta$Slope2~meta$ShoreDist)
+
+library(heplots) # for eta
+model.aov <- aov(Slope2 ~ ShoreDist, data = meta)
+summary(model.aov)
+etasq(model.aov, partial = FALSE)
+
+# Proportion of variance explained is .65
+# https://stats.stackexchange.com/questions/119835/correlation-between-a-nominal-iv-and-a-continuous-dv-variable
+
+rm(meta_sub, meta)
 ################################################################################
 # Function to calculate AUC #
 ################################################################################
