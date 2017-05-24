@@ -15,7 +15,8 @@ library(mgcv)
 library(ggplot2)
 library(lme4)
 library(dplyr)           # for distinct function 
-library(geepack)
+library(geepack)         # To make the GEE's
+#install_version("geepack", version = "1.0-7", repos = "http://cran.us.r-project.org")
 library(splines)
 library(RColorBrewer)
 library(MuMIn)           # for QIC
@@ -88,7 +89,7 @@ rm(meta_sub, meta)
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  pred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  clcpred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
   plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
@@ -399,7 +400,10 @@ ModelTable$Abs=0
 # list to store the models #
 modlist=list()
 
-# Function for backwards stepwise selection
+###############################################
+# Function for backwards stepwise selection #
+###############################################
+
 SelectModel=function(ModelFull){
   
   # Calculate the QIC of the full model
@@ -447,34 +451,43 @@ SelectModel=function(ModelFull){
 
   }
 
+######################################################
+# Function for walds signficance #
+######################################################
 
-# Function for walds signficance
 DropVarsWalds=function(ModelFull){
-  library(geeglm)
-  terms <- attr(ModelFull$terms,"term.labels")
-  
-  newmodel=list()
-  newQIC=list()
-  
-  newmodel[[1]]=ModelFull
-  newQIC[[1]]=fullmodQ
+
+  OldModel=ModelFull
+  # Get the anova values
+  temp=anova(ModelFull)
   
   # Make n models with selection
-  for (ii in 1:n){
-    dropvar=terms[ii]
-    newTerms <- terms[-match(dropvar,terms)]
-    newform <- as.formula(paste(".~.-",dropvar))
-    newmodel[[ii+1]] <- update(ModelFull,newform)
-    newQIC[[ii+1]] =QIC(newmodel[[ii]])
+  while(length(which(temp$`P(>|Chi|)`>.05))>0){
     
-    # Get the anova values
-    temp=anova(newmodel[[ii+1]])
+   
+
     
-    # find p values less than 0.05
-    which(temp$`P(>|Chi|)`<
+
     
+      
+      # get the maximum value
+      dropvar=rownames(temp)[which.max(temp$`P(>|Chi|)`)]
+      
+      # new formula for the full model
+      newform <- as.formula(paste(".~.-",dropvar))
+      
+      # new full model
+      ModelFull= update(ModelFull,newform) 
+      
+     # Get the model covariate names
+     terms <- attr(ModelFull$terms,"term.labels")
+     
+     # Get the anova values
+     temp=anova(ModelFull)
   }
   
+  NewModel=ModelFull
+  return(NewModel)
 }
 
 
@@ -511,7 +524,7 @@ for(ii in 1:10){
       ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
     
     ##########################################################################################
-    # First determine whether linear model or spline for Julien Day #
+    # Determine whether linear model or spline for Julien Day #
     #########################################################################################
     
     null=geeglm(OccAll~ShoreDist+Year, 
@@ -591,10 +604,13 @@ for(ii in 1:10){
     }
 
 
-    
+    # Bakcwards selection for QIC
     modlist[[ii]]=SelectModel(ModelFull)
     
     
+    # The Data are too sparse to support removal of unsignifcant terms
+    # # Walds test function to remove unsignificant terms
+    # modlist[[ii]]=DropVarsWalds(modlist[[ii]])
     
     
     
@@ -638,10 +654,16 @@ for(ii in 1:10){
   #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
   ModelTable$RsquaredAdj[ii]=r.squaredGLMM(modlist[[ii]])
   
-  AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
-  ModelTable$AUC[ii]=AUCvals[1]
-  ModelTable$Pres[ii]=AUCvals[2]
-  ModelTable$Abs[ii]=AUCvals[3]
+  if(sum(abs( coefficients(modlist[[ii]])))< 1e5){
+    AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
+    ModelTable$AUC[ii]=AUCvals[1]
+    ModelTable$Pres[ii]=AUCvals[2]
+    ModelTable$Abs[ii]=AUCvals[3]
+  } else{
+    
+   ModelTable[ii, c('AUC', 'Pres', 'Abs')]='Poor Fit'
+  }
+  
 
 }
 
