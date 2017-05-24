@@ -89,7 +89,7 @@ rm(meta_sub, meta)
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  clcpred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
+  pred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
   perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
   plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
   
@@ -369,7 +369,7 @@ Basic_table_bb$BinConf2015U=binconf(x=Basic_table_bb$NDetections2015, n = Basic_
 
 
 #################################################################################
-# Different Spline for all Locs #
+# Select Days with Detections #
 #################################################################################
 
 
@@ -395,6 +395,7 @@ ModelTable$RsquaredAdj=0
 ModelTable$AUC=0
 ModelTable$Pres=0
 ModelTable$Abs=0
+ModelTable$WaldsSigVars='none'
 
 
 # list to store the models #
@@ -462,12 +463,7 @@ DropVarsWalds=function(ModelFull){
   temp=anova(ModelFull)
   
   # Make n models with selection
-  while(length(which(temp$`P(>|Chi|)`>.05))>0){
-    
-   
-
-    
-
+  while(length(which(temp$`P(>|Chi|)`>.05))>0 & is.data.frame(temp)){
     
       
       # get the maximum value
@@ -482,15 +478,22 @@ DropVarsWalds=function(ModelFull){
      # Get the model covariate names
      terms <- attr(ModelFull$terms,"term.labels")
      
-     # Get the anova values
-     temp=anova(ModelFull)
+     # # Get the anova values
+     # temp=anova(ModelFull)
+     
+     temp=tryCatch({anova(ModelFull)}, error=function(e){e})
+     
+
   }
   
   NewModel=ModelFull
   return(NewModel)
 }
 
-
+########################################################
+# Fit Models and Predictions #
+#######################################################
+ 
 # Model selection for ten variables
 
 for(ii in 1:10){
@@ -609,9 +612,11 @@ for(ii in 1:10){
     
     
     # The Data are too sparse to support removal of unsignifcant terms
-    # # Walds test function to remove unsignificant terms
-    # modlist[[ii]]=DropVarsWalds(modlist[[ii]])
+    # However, significant terms can be displayed
     
+    # Walds test function to remove unsignificant terms
+    tempmod=DropVarsWalds(modlist[[ii]])
+    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
     
     
     
@@ -652,23 +657,16 @@ for(ii in 1:10){
   ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
   
   #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
-  ModelTable$RsquaredAdj[ii]=r.squaredGLMM(modlist[[ii]])
+  ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)
   
-  if(sum(abs( coefficients(modlist[[ii]])))< 1e5){
+ 
     AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
-    ModelTable$AUC[ii]=AUCvals[1]
-    ModelTable$Pres[ii]=AUCvals[2]
-    ModelTable$Abs[ii]=AUCvals[3]
-  } else{
-    
-   ModelTable[ii, c('AUC', 'Pres', 'Abs')]='Poor Fit'
+    ModelTable$AUC[ii]=round(AUCvals[1],2)
+    ModelTable$Pres[ii]=round(AUCvals[2],2)
+    ModelTable$Abs[ii]=round(AUCvals[3],2)
+
   }
   
-
-}
-
-
-
 
 
 # Add dummy dates for plotting (to fix the X axis)
@@ -809,7 +807,7 @@ p=list()
 Sd_P=list()
 Yr_P=list()
 
-
+# Visualise partial plots with data
 for(ii in 1:10){
   
   # Again subset the data
@@ -826,9 +824,18 @@ for(ii in 1:10){
   #######################################################
   # Julien Date Smoothes #
   #######################################################
-  fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   
+  if(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay')){
+  fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   fitdf_jdate$DummyDate=as.Date(fitdf_jdate$JulienDay, origin=as.Date("2013-01-01"))
+  
+  }else{
+    fitdf_jdate=data.frame(JulienDay=data_sub$JulienDay, 
+                           DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01")),
+                           y=NaN,
+                           LCI=NaN,
+                           UCI=NaN)
+  }
   
   
   
@@ -851,26 +858,45 @@ for(ii in 1:10){
   # Shore Dist Factors #
   #######################################################
   
-  BootstrapCoefs2=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
-  BootstrapCoefs2$GroupId=data_sub$GroupId[1]
+  if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'ShoreDist'))>0){
+    
+    BootstrapCoefs2=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
+    BootstrapCoefs2$GroupId=data_sub$GroupId[1]
+    
+  
+    }else{
+    BootstrapCoefs2=data.frame(ShoreDist=factor(c('ShoreDist05','ShoreDist10','ShoreDist15')), 
+                           vals=NaN,
+                           GroupId=data_sub$GroupId[1])
+  }
+  
+
   
   ggplot(BootstrapCoefs2, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
   
   #######################################################
   # Year as Factors #
   #######################################################
-  BootstrapCoefs3 = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
-  BootstrapCoefs3$GroupId=data_sub$GroupId[1]
-  
+
+ if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'Year'))>0){
+     BootstrapCoefs3 = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
+     BootstrapCoefs3$GroupId=data_sub$GroupId[1]
+     
+   }else{
+     BootstrapCoefs3=data.frame(Year=factor(c('Year2013','Year2014','Year2015')), 
+                                vals=NaN,
+                                GroupId=data_sub$GroupId[1])}
   ggplot(BootstrapCoefs3, aes(x=Year, y=inv.logit(vals)))+geom_violin()
   
+  
+
+
+
   
    Yr_P[[ii]]=ggplot(BootstrapCoefs3, aes(x=Year, y=vals)) +
      geom_boxplot() +
      theme_minimal()+
      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
-
-
   #############################
   # Add all data for plotting #
   ############################
@@ -901,7 +927,7 @@ for(ii in 1:10){
 }
 
 
-# Visualise partial plots with data
+
 
 
 # Bin the data for visualisation #
