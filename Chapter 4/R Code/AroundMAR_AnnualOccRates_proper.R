@@ -9,7 +9,7 @@
 #############
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
-rm(list=ls())
+#rm(list=ls())
 library(boot)            # for inv.logit
 library(mgcv)
 library(ggplot2)
@@ -220,7 +220,7 @@ OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset>1]=0.5
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$BBOcc==1]=0.77
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$FBOcc==1]=0.06
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$UNKOcc==1]=0.5
-OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = 1
+OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = .01
 # Total offset
 OccTable_daily$BNDTotOffset=(OccTable_daily$BBTot*.77+OccTable_daily$FBTot*.06+OccTable_daily$UNKTot*.5)/
   (OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
@@ -631,7 +631,7 @@ for(ii in 1:10){
 
     if(ii==6 |ii==5|ii==7){
       ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                       corstr = 'independence', 
+                       corstr = 'ar1', 
                        weights = BNDTotOffset, 
                        family = binomial, 
                        id     = UnitLoc, 
@@ -877,7 +877,7 @@ for(ii in 1:10){
   # Julien Date Smoothes #
   #######################################################
   
-  if(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay')){
+  if((grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay')) >0){
   fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   fitdf_jdate$DummyDate=as.Date(fitdf_jdate$JulienDay, origin=as.Date("2013-01-01"))
   
