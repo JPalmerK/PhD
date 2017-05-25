@@ -261,6 +261,8 @@ ggplot(data=mm, aes(x=med, y=BBOcc, color=ShoreDist)) +
   ggtitle('BND Occupancy')
 
 
+
+
 #################################################################################
 # Table For Number of Detections at Each Unit Loc #
 #################################################################################
@@ -381,6 +383,33 @@ OccTable_daily_wDetections= OccTable_daily[OccTable_daily$YrUnitLoc %in%
 
 OccTable_daily_wDetections=droplevels(OccTable_daily_wDetections)
 
+
+
+
+###############################################################################
+# Visualise the daily autocorrelation #
+###############################################################################
+
+data_detections=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==1,]
+data_detections=data_detections[order(data_detections$UnitLoc, data_detections$JulienDay),]
+data_detections$DiffDays=0
+
+for(ii in 1:length(unique(data_detections$UnitLoc))){
+  idx=which(data_detections$UnitLoc==unique(data_detections$UnitLoc)[ii])
+  data_detections$DiffDays[idx]=c(0,data_detections$JulienDay[idx[2:length(idx)]]-data_detections$JulienDay[idx[1:(length(idx)-1)]])
+}
+
+data_detections$DiffDays[data_detections$DiffDays>80]=0
+
+# Interleaved histograms
+ggplot(data_detections, aes(x=DiffDays, fill=ShoreDist)) +
+  facet_wrap(~GroupId) +
+  geom_histogram(binwidth=.5, position="dodge") +
+  ylim(0,20) +
+  xlim(0, 30) +
+  theme_bw()
+
+  
 # Table to store model performance #
 ModelTable=data.frame(DeplotymentLoc=unique(OccTable$GroupId))
 ModelTable$ModelFormula='none'
@@ -410,9 +439,11 @@ SelectModel=function(ModelFull){
   # Calculate the QIC of the full model
   fullmodQ=QIC(ModelFull)
   newQIC=0
+  terms=attr(ModelFull$terms,"term.labels")
+
   
-  
-  while(newQIC != fullmodQ){
+  while(newQIC != fullmodQ & length(terms)>1){
+    
   
   # get all the terms for the full model
   terms <- attr(ModelFull$terms,"term.labels")
@@ -444,6 +475,8 @@ SelectModel=function(ModelFull){
     ModelFull=ModelFull
     newQIC=min(unlist(newQIC))
   }
+
+  
   #end the model selection
 
 
@@ -457,7 +490,14 @@ SelectModel=function(ModelFull){
 ######################################################
 
 DropVarsWalds=function(ModelFull){
-
+  
+  # If no terms included return 
+  if (length(attr(ModelFull$terms,"term.labels"))<2){
+    NewModel='No Covariates to select from'
+  
+    }else{
+  
+  
   OldModel=ModelFull
   # Get the anova values
   temp=anova(ModelFull)
@@ -487,6 +527,8 @@ DropVarsWalds=function(ModelFull){
   }
   
   NewModel=ModelFull
+    }
+  
   return(NewModel)
 }
 
@@ -500,10 +542,7 @@ for(ii in 1:10){
     data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
     data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
     data_sub <- droplevels(data_sub)
-    
-    
-    
-    
+
     ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
     ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
     ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
@@ -532,21 +571,21 @@ for(ii in 1:10){
     
     null=geeglm(OccAll~ShoreDist+Year, 
                          corstr = 'ar1', 
-                         offset = BNDTotOffset, 
+                         weights  = BNDTotOffset, 
                          family = binomial, 
                          id     = UnitLoc, 
                          data   = data_sub) 
     
     mod1=geeglm(OccAll~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)), 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                weights  = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
     mod2=geeglm(OccAll~ShoreDist+Year+JulienDay, 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                weights = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
@@ -557,21 +596,21 @@ for(ii in 1:10){
    
     null=geeglm(OccAll~ShoreDist, 
                   corstr = 'ar1', 
-                  offset = BNDTotOffset, 
+                  weights  = BNDTotOffset, 
                   family = binomial, 
                   id     = UnitLoc, 
                   data   = data_sub) 
     
     mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                weights = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
     mod2=geeglm(OccAll~ShoreDist+JulienDay, 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                weights = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
@@ -593,7 +632,7 @@ for(ii in 1:10){
     if(ii==6 |ii==5|ii==7){
       ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
                        corstr = 'independence', 
-                       offset = BNDTotOffset, 
+                       weights = BNDTotOffset, 
                        family = binomial, 
                        id     = UnitLoc, 
                        data   = data_sub)
@@ -616,11 +655,15 @@ for(ii in 1:10){
     
     # Walds test function to remove unsignificant terms
     tempmod=DropVarsWalds(modlist[[ii]])
-    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
+    
+    if(is.character(tempmod)){
+      ModelTable$WaldsSigVars[ii]=tempmod
+    }else{
+      ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
+    }
     
     
-    
-    
+
     
     # Create Aggregated data for plotting
     OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
@@ -659,11 +702,18 @@ for(ii in 1:10){
   #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
   ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)
   
- 
+  if(is.character(tempmod)){
+    ModelTable$AUC[ii]='NA'
+    ModelTable$Pres[ii]='NA'
+    ModelTable$Abs[ii]='NA'
+  }else{
     AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
     ModelTable$AUC[ii]=round(AUCvals[1],2)
     ModelTable$Pres[ii]=round(AUCvals[2],2)
     ModelTable$Abs[ii]=round(AUCvals[3],2)
+  }
+
+
 
   }
   
@@ -718,7 +768,8 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
 # Get the Partial Plots for each plot Group ID               #
 ##################################################################
 
-# Code based on MUMIN run.partials Scott-Hayward 2015
+# Functions for calculating partial contributions for
+# factors and continuous variables 
 partialDF=function(mod, data, Variable){
   
   coefpos <- c(1, grep(Variable, colnames(model.matrix(mod))))
@@ -751,6 +802,7 @@ partialDF=function(mod, data, Variable){
   colnames(fitdf)[1]=Variable
   return(fitdf)
 }
+
 
 partialdf_factor=function(mod, data, variable){
   coeffac <- c(1,grep(variable, colnames(model.matrix(mod))))
