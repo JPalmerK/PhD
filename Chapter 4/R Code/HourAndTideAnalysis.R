@@ -552,6 +552,25 @@ TideREGroup=geeglm(OccAll ~Year+ ShoreDist + GroupId:bs(HourAfterHigh, knots = m
                   offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
  
+##########################################################################
+# Check group id or slope #
+########################################################################
+
+ # In sufficient DOF to look at unit loc as a fixed effect 
+ ModelFull_slope=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+Slope2+ShoreDist+Year+HourAfterHigh,
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=UnitLoc:Date,
+                  offset = BNDTotOffset,
+                  data = OccTable_DPD_nocro)
+ 
+ QIC(ModelFull, ModelFull_slope)
+ 
+# Model with group ID wins
+ 
+ 
+ 
+ 
  Model_out=SelectModel(ModelFull)
  
  ##############################################################################################
