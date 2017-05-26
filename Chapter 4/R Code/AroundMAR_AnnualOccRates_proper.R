@@ -79,6 +79,7 @@ etasq(model.aov, partial = FALSE)
 # https://stats.stackexchange.com/questions/119835/correlation-between-a-nominal-iv-and-a-continuous-dv-variable
 
 rm(meta_sub, meta)
+
 ################################################################################
 # Function to calculate AUC #
 ################################################################################
@@ -402,12 +403,12 @@ for(ii in 1:length(unique(data_detections$UnitLoc))){
 data_detections$DiffDays[data_detections$DiffDays>80]=0
 
 # Interleaved histograms
-ggplot(data_detections, aes(x=DiffDays, fill=ShoreDist)) +
+ggplot(data_detections, aes(x=DiffDays, fill=as.factor(ShoreDist))) +
   facet_wrap(~GroupId) +
   geom_histogram(binwidth=.5, position="dodge") +
   ylim(0,20) +
   xlim(0, 30) +
-  theme_bw()
+  theme_minimal()
 
   
 # Table to store model performance #
@@ -877,7 +878,7 @@ for(ii in 1:10){
   # Julien Date Smoothes #
   #######################################################
   
-  if((grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay')) >0){
+  if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay'))>0){
   fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
   fitdf_jdate$DummyDate=as.Date(fitdf_jdate$JulienDay, origin=as.Date("2013-01-01"))
   
