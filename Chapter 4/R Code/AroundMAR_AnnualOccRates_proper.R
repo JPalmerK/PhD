@@ -428,8 +428,6 @@ ModelTable$Abs=0
 ModelTable$WaldsSigVars='none'
 
 
-# list to store the models #
-modlist=list()
 
 ###############################################
 # Function for backwards stepwise selection #
@@ -539,164 +537,188 @@ DropVarsWalds=function(ModelFull){
  
 # Model selection for ten variables
 
-for(ii in 1:10){
-    data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
-    data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
-    data_sub <- droplevels(data_sub)
+# 
+# # Change BND detections 
+# OccTable_daily_wDetections$BNDTotOffset[OccTable_daily_wDetections$BNDTotOffset==1]=0
+# 
 
-    ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
-    ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
-    ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+# # Add dummy Y variable
+# OccTable_daily_wDetections$y=round(OccTable_daily_wDetections$BNDTotOffset,3)*1e3
+# OccTable_daily_wDetections$n=1e3
+# 
+
+
+
+
+
+# list to store the models #
+modlist=list()
+
+
+# Model selection for ten variables
+for(ii in 1:10){
   
-    newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year'))
-    newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
-                                OccAll=0,
-                                ShoreDist=unique(newdat$ShoreDist),
-                                GroupId=unique(newdat$GroupId),
-                                Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
+  
+  data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+  data_sub <- droplevels(data_sub)
+  
+  
+  ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
+  ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
+  ModelTable$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+  
+  newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','BNDTotOffset'))
+  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
+                              OccAll=0,
+                              ShoreDist=factor(unique(newdat$ShoreDist)),
+                              GroupId=unique(newdat$GroupId),
+                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
+  
+  
+  tryCatch({
+    ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
+  
+  tryCatch({
+    ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
+  
+  
+  tryCatch({
+    ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
+  
+  ##########################################################################################
+  # Determine whether linear model or spline for Julien Day #
+  #########################################################################################
+  
+  null=geeglm(OccAll~ShoreDist, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
+              corstr = 'ar1', 
+              offset  = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  mod2=geeglm(OccAll~ShoreDist+JulienDay, 
+              corstr = 'ar1', 
+              offset = BNDTotOffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  QICvals=QIC(null, mod1, mod2)
+  
+  if (sum(QICvals>10e+15)>2){
     
-    
-    tryCatch({
-      ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
-    
-    tryCatch({
-      ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
-    
-    
-    tryCatch({
-      ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
-    
-    ##########################################################################################
-    # Determine whether linear model or spline for Julien Day #
-    #########################################################################################
-    
-    null=geeglm(OccAll~ShoreDist+Year, 
-                         corstr = 'ar1', 
-                         weights  = BNDTotOffset, 
-                         family = binomial, 
-                         id     = UnitLoc, 
-                         data   = data_sub) 
-    
-    mod1=geeglm(OccAll~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)), 
+    null=geeglm(OccAll~Year, 
                 corstr = 'ar1', 
-                weights  = BNDTotOffset, 
+                offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
-    mod2=geeglm(OccAll~ShoreDist+Year+JulienDay, 
+    mod1=geeglm(OccAll~Year+bs(JulienDay, knots = mean(JulienDay)), 
                 corstr = 'ar1', 
-                weights = BNDTotOffset, 
+                offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
-                data   = data_sub) 
+                data   = data_sub)
     
-    QICvals=QIC(null, mod1, mod2)
-    
-    if (sum(QICvals>10e+15)>2){
-   
-    null=geeglm(OccAll~ShoreDist, 
-                  corstr = 'ar1', 
-                  weights  = BNDTotOffset, 
-                  family = binomial, 
-                  id     = UnitLoc, 
-                  data   = data_sub) 
-    
-    mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
+    mod2=geeglm(OccAll~Year+JulienDay, 
                 corstr = 'ar1', 
-                weights = BNDTotOffset, 
+                offset = BNDTotOffset, 
                 family = binomial, 
                 id     = UnitLoc, 
-                data   = data_sub) 
-    
-    mod2=geeglm(OccAll~ShoreDist+JulienDay, 
-                corstr = 'ar1', 
-                weights = BNDTotOffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub) 
+                data   = data_sub)
     
     QICvals=QIC(null, mod1, mod2)}
-    
-    JdateForm=which.min(QICvals[2:3,1]-QICvals[1,1])
-    if(JdateForm==1){
-      JdateForm='bs(JulienDay, knots = mean(JulienDay))'
-    }else{
-      JdateForm='JulienDay'
-    }
-    
-    #############################################################################################
-    # Fit the Models and do backwards AIC  #
-    #############################################################################################
-    
-
-    if(ii==6 |ii==5|ii==7){
-      ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                       corstr = 'ar1', 
-                       weights = BNDTotOffset, 
-                       family = binomial, 
-                       id     = UnitLoc, 
-                       data   = data_sub)
-    }else{
-      ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                           corstr = 'ar1', 
-                           offset = BNDTotOffset, 
-                           family = binomial, 
-                           id     = UnitLoc, 
-                           data   = data_sub)
-    }
-
-
-    # Bakcwards selection for QIC
-    modlist[[ii]]=SelectModel(ModelFull)
-    
-    
-    # The Data are too sparse to support removal of unsignifcant terms
-    # However, significant terms can be displayed
-    
-    # Walds test function to remove unsignificant terms
-    tempmod=DropVarsWalds(modlist[[ii]])
-    
-    if(is.character(tempmod)){
-      ModelTable$WaldsSigVars[ii]=tempmod
-    }else{
-      ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
-    }
-    
-    
-
-    
-    # Create Aggregated data for plotting
-    OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
-                                                      BBOcc~DayBin+GroupId+ShoreDist, FUN=mean))
-    OneYearAggs=cbind(OneYearAggs,
-                      aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)), 
-                                JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
-   
-    OneYearAggs=cbind(OneYearAggs,
-                      aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
-                                     BNDTotOffset~DayBin+GroupId+ShoreDist, FUN=mean))
-    
-    
-    colnames(OneYearAggs)[5]=c('med')
-    colnames(OneYearAggs)[4]='OccAll'
-    
-    OneYearAggs$JulienDay=OneYearAggs$med
-    OneYearAggs$Year=unique(newdat_perdOnly$Year)
-    
+  
+  JdateForm=which.min(QICvals[2:3,1]-QICvals[1,1])
+  if(JdateForm==1){
+    JdateForm='bs(JulienDay, knots = mean(JulienDay))'
+  }else{
+    JdateForm='JulienDay'
+  }
+  
+  #############################################################################################
+  # Fit the Models and do backwards AIC  #
+  #############################################################################################
+  
+  
+  if(ii==6 |ii==5|ii==7){
+    ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+                     corstr = 'ar1', 
+                     offset = BNDTotOffset, 
+                     family = binomial, 
+                     id     = UnitLoc, 
+                     data   = data_sub)
+  }else{
+    ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+                     corstr = 'ar1', 
+                     offset = BNDTotOffset, 
+                     family = binomial, 
+                     id     = UnitLoc, 
+                     data   = data_sub)
+  }
+  
+  
+  # Bakcwards selection for QIC
+  modlist[[ii]]=SelectModel(ModelFull)
+  
+  
+  # The Data are too sparse to support removal of unsignifcant terms
+  # However, significant terms can be displayed
+  
+  # Walds test function to remove unsignificant terms
+  tempmod=DropVarsWalds(modlist[[ii]])
+  
+  if(is.character(tempmod)){
+    ModelTable$WaldsSigVars[ii]=tempmod
+  }else{
+    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
+  }
+  
+  
+  
+  
+  # Create Aggregated data for plotting
+  OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
+                                   OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
+  OneYearAggs=cbind(OneYearAggs,
+                    aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)), 
+                              JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
+  
+  OneYearAggs=cbind(OneYearAggs,
+                    data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
+                                   BNDTotOffset~DayBin+GroupId+ShoreDist, FUN=mean))[,4])
+  
+  
+  colnames(OneYearAggs)[5]=c('med')
+  colnames(OneYearAggs)[4]='OccAll'
+  colnames(OneYearAggs)[6]='BNDTotOffset'
+  
+  
+  OneYearAggs$JulienDay=OneYearAggs$med
+  OneYearAggs$Year=unique(newdat_perdOnly$Year)
+  
   if(ii==1){
     fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-    dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+    #dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
     AggData=cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs))
     
     
   }else {
     fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-    dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+    #dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
     AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
   }
   
-    
+  
   ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
   ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
   
@@ -713,11 +735,11 @@ for(ii in 1:10){
     ModelTable$Pres[ii]=round(AUCvals[2],2)
     ModelTable$Abs[ii]=round(AUCvals[3],2)
   }
-
-
-
-  }
   
+  
+  
+}
+
 
 
 # Add dummy dates for plotting (to fix the X axis)
@@ -1005,10 +1027,10 @@ ggplot(data=fitdf_jdate_out) +
   geom_line(aes(DummyDate, y), size=1) +
   geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI),
               alpha=.2,linetype= 'blank') +
-  geom_rug(data=subset(OccTable_daily_wDetections, BBOcc==1), 
+  geom_rug(data=subset(OccTable_daily_wDetections, OccAll==1), 
            aes(x=DummyDate, y=BBOcc*.3),
            sides='t', alpha=.8) +
-  geom_rug(data=subset(OccTable_daily_wDetections, BBOcc==0), 
+  geom_rug(data=subset(OccTable_daily_wDetections, OccAll==0), 
            aes(x=DummyDate, y=BBOcc),
            sides='b', alpha=.8) +
   xlab("") +
