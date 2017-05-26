@@ -228,146 +228,265 @@ CalcAUC<-function(mod, data_sub){
 # 1) Determine what form hour of day should take (linear offset, interaction or smooth)
 #############################################################################################################################
 
-# # An empty model is fitted: the binary response "OccAll" is modelled as a function of year, shore dist and GroupID only. These are expressed as B-splines with 
-# # one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date" 
-# # such that within each day the probability of detecting a click depends on whether a click was detected in the previous hour 
-# 
-# empty=geeglm(OccAll ~ Year+ ShoreDist + GroupId,
-#        corstr = 'ar1',
-#        family = binomial, # leave out constrains
-#        id=GroupId:Date,
-#        offset = BNDTotOffset,
-#        data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
+# An empty model is fitted: the binary response "OccAll" is modelled as a function of year, shore dist and GroupID only. These are expressed as B-splines with
+# one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date"
+# such that within each day the probability of detecting a click depends on whether a click was detected in the previous hour
 
-# 
-# 
-# ## Test linear or smooth for hour of day and with or without an interaction with GroupID 
-# HoDl=geeglm(OccAll ~Year+ ShoreDist + GroupId + HourAfterPeakSolEle,
-#        corstr = 'ar1', 
-#        family = binomial, # leave out constrains
-#        id=GroupId:Date, 
-#        offset = BNDTotOffset, 
-#        data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# HoDs=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
-#             corstr = 'ar1', 
-#             family = binomial, # leave out constrains
-#             id=GroupId:Date, 
-#             offset = BNDTotOffset, 
-#             data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# HoDIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))*GroupId,
-#             corstr = 'ar1', 
-#             family = binomial, # leave out constrains
-#             id=GroupId:Date, 
-#             offset = BNDTotOffset, 
-#             data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# HoDIntl=geeglm(OccAll ~Year+ ShoreDist + GroupId*HourAfterPeakSolEle,
-#                corstr = 'ar1', 
-#                family = binomial, # leave out constrains
-#                id=GroupId:Date, 
-#                offset = BNDTotOffset, 
-#                data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# 
-# # Try group ID as a random effect
-# HoDsREGroup=geeglm(OccAll ~Year+ ShoreDist + GroupId:bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
-#             corstr = 'ar1', 
-#             family = binomial, # leave out constrains
-#             id=GroupId:Date, 
-#             offset = BNDTotOffset, 
-#             data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# 
-# 
-# 
-# 
-# 
-# QIC(empty, HoDl, HoDs, HoDIntS, HoDIntl, HoDsREGroup)
-# 
-# 
-# # QIC
-# # empty   19746.04
-# # HoDl    19756.12
-# # HoDs    19215.70 # Winner 
-# # HoDIntS 19266.08
-# # HoDIntl 19787.06 
-# 
+OccTable_DPD_nocro=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
+OccTable_DPD_nocro=droplevels(OccTable_DPD_nocro)
+
+
+OccTable_DPD_nocro$Weights=ceiling(1/OccTable_DPD_nocro$BNDTotOffset)+1
+
+empty=geeglm(OccAll ~ Year+ ShoreDist + GroupId,
+       corstr = 'independence',
+       family = binomial, # leave out constrains
+       id=GroupId:Date,
+       weights = Weights,
+       data = OccTable_DPD_nocro)
+
+
+
+
+## Test linear or smooth for hour of day and with or without an interaction with GroupID
+HoDl=geeglm(OccAll ~Year+ ShoreDist + GroupId + HourAfterPeakSolEle,
+       corstr = 'independence',
+       family = binomial, # leave out constrains
+       id=GroupId:Date,
+       weights = Weights,
+       data = OccTable_DPD_nocro)
+
+HoDs=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+            corstr = 'independence',
+            family = binomial, # leave out constrains
+            id=GroupId:Date,
+            weights = Weights,
+            data = OccTable_DPD_nocro)
+
+HoDIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))*GroupId,
+            corstr = 'independence',
+            family = binomial, # leave out constrains
+            id=GroupId:Date,
+            weights = Weights,
+            data = OccTable_DPD_nocro)
+
+HoDIntl=geeglm(OccAll ~Year+ ShoreDist + GroupId*HourAfterPeakSolEle,
+               corstr = 'independence',
+               family = binomial, # leave out constrains
+               id=GroupId:Date,
+               weights = Weights,
+               data = OccTable_DPD_nocro)
+
+
+# Try group ID as a random effect
+HoDsREGroup=geeglm(OccAll ~Year+ ShoreDist + GroupId:bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+            corstr = 'Independence',
+            family = binomial, # leave out constrains
+            id=GroupId:Date,
+            weights = Weights,
+            data = OccTable_DPD_nocro)
+
+
+
+
+
+
+QIC(empty, HoDl, HoDs, HoDIntS, HoDIntl) #, HoDsREGroup)
+
+# QIC
+# empty   24019.06
+# HoDl    24112.47
+# HoDs    23793.33 #WINN
+# HoDIntS 25280.16
+# HoDIntl 24574.48
+
+
+
 # #############################################################################################################################
 # # 2) Determine what form tidal phase should take (linear offset, interaction or smooth)
 # #############################################################################################################################
-# 
-## Test linear or smooth for hour of day and with or without an interaction with GroupID
-# TideDl=geeglm(OccAll ~Year+ ShoreDist + GroupId + HourAfterHigh,
-#               corstr = 'ar1',
-#               family = binomial, # leave out constrains
-#               id=GroupId:Date,
-#               offset = BNDTotOffset,
-#               data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# Tides=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
-#              corstr = 'ar1',
-#              family = binomial, # leave out constrains
-#              id=GroupId:Date,
-#              offset = BNDTotOffset,
-#              data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# TidesPh=geeglm(OccAll ~Year+ ShoreDist + GroupId + Phase,
-#               corstr = 'ar1',
-#               family = binomial, # leave out constrains
-#               id=GroupId:Date,
-#               offset = BNDTotOffset,
-#               data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# TidesPhInt=geeglm(OccAll ~Year+ ShoreDist*Phase + GroupId ,
-#                corstr = 'ar1',
-#                family = binomial, # leave out constrains
-#                id=GroupId:Date,
-#                offset = BNDTotOffset,
-#                data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# TideIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh))*ShoreDist,
-#                 corstr = 'ar1',
-#                 family = binomial, # leave out constrains
-#                 id=GroupId:Date,
-#                 offset = BNDTotOffset,
-#                 data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]) #Fail
-# 
-# TideIntl=geeglm(OccAll ~Year+ ShoreDist + GroupId*HourAfterHigh,
-#                 corstr = 'ar1',
-#                 family = binomial, # leave out constrains
-#                 id=GroupId:Date,
-#                 offset = BNDTotOffset,
-#                 data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-# # Try group ID as a random effect
-# TideREGroup=geeglm(OccAll ~Year+ ShoreDist + GroupId:bs(HourAfterHigh, knots = mean(HourAfterHigh)),
-#                    corstr = 'ar1',
-#                    family = binomial, # leave out constrains
-#                    id=GroupId:Date,
-#                    offset = BNDTotOffset,
-#                    data = OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',])
-# 
-#  
-#  QIC(empty, TideDl, Tides, TideIntl, TideREGroup, TideIntS, TidesPh, TidesPhInt) #TideIntS
-# 
-# # QIC
-# # empty       19746.04
-# # TideDl      19708.60 #Winner
-# # Tides       19717.72
-# # TideIntl    19728.36
-# # TideREGroup 19754.79
-# # TideIntS    19731.57
+
+# Test linear or smooth for hour of day and with or without an interaction with GroupID
+TideDl=geeglm(OccAll ~Year+ ShoreDist + GroupId + HourAfterHigh,
+              corstr = 'independence',
+              family = binomial, # leave out constrains
+              id=GroupId:Date,
+              weights  = Weights,
+              data = OccTable_DPD_nocro)
+
+Tides=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+             corstr = 'ar1',
+             family = binomial, # leave out constrains
+             id=GroupId:Date,
+             weights = round(1/BNDTotOffset),
+             data = OccTable_DPD_nocro)
+
+TidesPh=geeglm(OccAll ~Year+ ShoreDist + GroupId + Phase,
+              corstr = 'ar1',
+              family = binomial, # leave out constrains
+              id=GroupId:Date,
+              weights = round(1/BNDTotOffset),
+              data = OccTable_DPD_nocro)
+
+TidesPhInt=geeglm(OccAll ~Year+ ShoreDist*Phase + GroupId ,
+               corstr = 'ar1',
+               family = binomial, # leave out constrains
+               id=GroupId:Date,
+               weights  = round(1/BNDTotOffset),
+               data = OccTable_DPD_nocro)
+
+TideIntS=geeglm(OccAll ~Year+ ShoreDist + GroupId + bs(HourAfterHigh, knots = mean(HourAfterHigh))*ShoreDist,
+                corstr = 'ar1',
+                family = binomial, # leave out constrains
+                id=GroupId:Date,
+                weights = round(1/BNDTotOffset),
+                data = OccTable_DPD_nocro) #Fail
+
+TideIntl=geeglm(OccAll ~Year+ ShoreDist + GroupId*HourAfterHigh,
+                corstr = 'ar1',
+                family = binomial, # leave out constrains
+                id=GroupId:Date,
+                weights = round(1/BNDTotOffset),
+                data = OccTable_DPD_nocro)
+
+# Try group ID as a random effect
+TideREGroup=geeglm(OccAll ~Year+ ShoreDist + GroupId:bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+                   corstr = 'ar1',
+                   family = binomial, # leave out constrains
+                   id=GroupId:Date,
+                   weights = round(1/BNDTotOffset),
+                   data = OccTable_DPD_nocro)
 
 
+ QIC(empty, TideDl, Tides, TideIntl, TideREGroup, TideIntS, TidesPh, TidesPhInt) #TideIntS
+
+
+ # QIC
+ # empty       17627.26
+ # TideDl      17605.08 #Winner
+ # Tides       17620.99
+ # TideIntl    17615.29
+ # TideREGroup 17691.43
+ # TideIntS    17629.39
+ # TidesPh     17617.58
+ # TidesPhInt  17623.96
  
  
 # #########################################################################################################################
 # ## 3 Use backwards selection to get the model order ##
 # #########################################################################################################################
-# # 
+
+ SelectModel=function(ModelFull){
+   
+   # Calculate the QIC of the full model
+   fullmodQ=QIC(ModelFull)
+   newQIC=0
+   terms=attr(ModelFull$terms,"term.labels")
+   
+   
+   while(newQIC != fullmodQ & length(terms)>1){
+     
+     
+     # get all the terms for the full model
+     terms <- attr(ModelFull$terms,"term.labels")
+     n=length(terms)
+     
+     newmodel=list()
+     newQIC=list()
+     
+     newmodel[[1]]=ModelFull
+     newQIC[[1]]=fullmodQ
+     
+     # Make n models with selection
+     for (ii in 1:n){
+       dropvar=terms[ii]
+       newTerms <- terms[-match(dropvar,terms)]
+       newform <- as.formula(paste(".~.-",dropvar))
+       newmodel[[ii+1]] <- update(ModelFull,newform)
+       newQIC[[ii+1]] =QIC(newmodel[[ii]])
+       print(ii)
+       
+     }
+     
+     # Get the model with the lowest QIC
+     LowestMod=which.min(unlist(newQIC))
+     
+     if (LowestMod != 1){
+       ModelFull=newmodel[[LowestMod]]
+       newQIC=min(unlist(newQIC))
+     } else {
+       ModelFull=ModelFull
+       newQIC=min(unlist(newQIC))
+     }
+     
+     
+     #end the model selection
+     
+     
+   }
+   return(ModelFull)
+   
+ }
+ 
+ 
+ ModelFull=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+GroupId+ShoreDist+Year+HourAfterHigh,
+                   corstr = 'ar1',
+                   family = binomial, # leave out constrains
+                   id=GroupId:Date,
+                   weights = round(1/BNDTotOffset),
+                   data = OccTable_DPD_nocro)
+ 
+ Model_out=SelectModel(ModelFull)
+ 
+ ##############################################################################################
+ ## Use repeated Walds tests to select drivers  ####
+ #############################################################################################
+ 
+ DropVarsWalds=function(ModelFull){
+   
+   # If no terms included return 
+   if (length(attr(ModelFull$terms,"term.labels"))<2){
+     NewModel='No Covariates to select from'
+     
+   }else{
+     
+     
+     OldModel=ModelFull
+     # Get the anova values
+     temp=anova(ModelFull)
+     
+     # Make n models with selection
+     while(length(which(temp$`P(>|Chi|)`>.05))>0 & is.data.frame(temp)){
+       
+       
+       # get the maximum value
+       dropvar=rownames(temp)[which.max(temp$`P(>|Chi|)`)]
+       
+       # new formula for the full model
+       newform <- as.formula(paste(".~.-",dropvar))
+       
+       # new full model
+       ModelFull= update(ModelFull,newform) 
+       
+       # Get the model covariate names
+       terms <- attr(ModelFull$terms,"term.labels")
+       
+       # # Get the anova values
+       # temp=anova(ModelFull)
+       
+       temp=tryCatch({anova(ModelFull)}, error=function(e){e})
+       
+       
+     }
+     
+     NewModel=ModelFull
+   }
+   
+   return(NewModel)
+ }
+ 
+ Model_out=DropVarsWalds(Model_out)
+ 
 # QIC(geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+GroupId+ShoreDist+Year+HourAfterHigh,
 #            corstr = 'ar1',
 #            family = binomial, # leave out constrains
