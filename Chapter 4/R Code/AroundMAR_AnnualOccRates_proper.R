@@ -548,9 +548,6 @@ DropVarsWalds=function(ModelFull){
 # 
 
 
-
-
-
 # list to store the models #
 modlist=list()
 
@@ -652,7 +649,7 @@ for(ii in 1:10){
   
   if(ii==6 |ii==5|ii==7){
     ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                     corstr = 'ar1', 
+                     corstr = 'exchangable', 
                      offset = BNDTotOffset, 
                      family = binomial, 
                      id     = UnitLoc, 
