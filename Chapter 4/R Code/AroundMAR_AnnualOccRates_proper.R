@@ -566,13 +566,7 @@ for(ii in 1:10){
   ModelTable$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
   
   newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','BNDTotOffset'))
-  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
-                              OccAll=0,
-                              ShoreDist=factor(unique(newdat$ShoreDist)),
-                              GroupId=unique(newdat$GroupId),
-                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
-  
-  
+
   tryCatch({
     ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
   
@@ -683,7 +677,15 @@ for(ii in 1:10){
   
   
   
-  # Create Aggregated data for plotting
+  
+  year_temp=unique(data_sub$Year)[which.max(aggregate(data=data_sub, JulienDay~Year, FUN=length)[,2])]
+  
+  newdat_perdOnly=expand.grid(Year= year_temp,
+                              ShoreDist=factor(unique(newdat$ShoreDist)),
+                              JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
+                              GroupId=unique(newdat$GroupId),
+                              OccAll=0)
+
   OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
                                    OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
   OneYearAggs=cbind(OneYearAggs,
@@ -703,15 +705,17 @@ for(ii in 1:10){
   OneYearAggs$JulienDay=OneYearAggs$med
   OneYearAggs$Year=unique(newdat_perdOnly$Year)
   
+  
+  
   if(ii==1){
     fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-    #dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+    dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
     AggData=cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs))
     
     
   }else {
     fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-    #dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+    dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
     AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
   }
   
