@@ -167,7 +167,7 @@ OccTable$SpeciesOffset[OccTable$SpeciesOffset>1]=0.5
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$BBOcc==1]=0.77
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$FBOcc==1]=0.06
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$UNKOcc==1]=0.5
-OccTable$SpeciesOffset[OccTable$SpeciesOffset==0] = 1
+#OccTable$SpeciesOffset[OccTable$SpeciesOffset==0] = 1
 
 OccTable$BNDTotOffset=(OccTable$BBOcc*.77+OccTable$FBOcc*.06+OccTable$UNKOcc*.5)/(OccTable$BBOcc+OccTable$FBOcc+OccTable$UNKOcc)
 
@@ -221,7 +221,8 @@ OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset>1]=0.5
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$BBOcc==1]=0.77
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$FBOcc==1]=0.06
 OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$UNKOcc==1]=0.5
-OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = .01
+#OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = .01
+
 # Total offset
 OccTable_daily$BNDTotOffset=(OccTable_daily$BBTot*.77+OccTable_daily$FBTot*.06+OccTable_daily$UNKTot*.5)/
   (OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
@@ -429,9 +430,8 @@ ModelTable$WaldsSigVars='none'
 
 
 
-###############################################
-# Function for backwards stepwise selection #
-###############################################
+# Functions  ##
+
 
 SelectModel=function(ModelFull){
   
@@ -484,10 +484,6 @@ SelectModel=function(ModelFull){
 
   }
 
-######################################################
-# Function for walds signficance #
-######################################################
-
 DropVarsWalds=function(ModelFull){
   
   # If no terms included return 
@@ -535,19 +531,6 @@ DropVarsWalds=function(ModelFull){
 # Fit Models and Predictions #
 #######################################################
  
-# Model selection for ten variables
-
-# 
-# # Change BND detections 
-# OccTable_daily_wDetections$BNDTotOffset[OccTable_daily_wDetections$BNDTotOffset==1]=0
-# 
-
-# # Add dummy Y variable
-# OccTable_daily_wDetections$y=round(OccTable_daily_wDetections$BNDTotOffset,3)*1e3
-# OccTable_daily_wDetections$n=1e3
-# 
-
-
 
 
 
@@ -685,6 +668,14 @@ for(ii in 1:10){
   
   
   
+  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
+                              OccAll=0,
+                              ShoreDist=factor(unique(newdat$ShoreDist)),
+                              GroupId=unique(newdat$GroupId),
+                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=length)[,2]),1])
+  
+  
+  
   
   # Create Aggregated data for plotting
   OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
@@ -708,13 +699,13 @@ for(ii in 1:10){
   
   if(ii==1){
     fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-    #dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
+    dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
     AggData=cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs))
     
     
   }else {
     fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-    #dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
+    dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
     AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
   }
   
