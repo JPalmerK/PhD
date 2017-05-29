@@ -330,7 +330,7 @@ OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$UNKOcc==1]=0.5
 OccTable$BNDTotOffset=(OccTable$BBOcc*.77+OccTable$FBOcc*.06+OccTable$UNKOcc*.5)/(OccTable$BBOcc+OccTable$FBOcc+OccTable$UNKOcc)
 
 
-OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=1
+OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=0
 
 
 # 2a) Aggregate hourly Detections into Daily Occupancy table ######################################################
@@ -388,7 +388,7 @@ OccTable_daily$BNDTotOffset=(OccTable_daily$BBTot*.77+OccTable_daily$FBTot*.06+O
 
 OccTable_daily$TotDet=(OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
 
-OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=1
+OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=0
 
 rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
 
@@ -585,7 +585,7 @@ ggplot(data_detections, aes(x=DiffDays, fill=as.factor(ShoreDist))) +
 
 # 6)  Fit Models and Predictions (make sure to load predictvcv first!) #########################################################
 
- 
+
 # Table to store model performance #
 ModelTable=data.frame(DeplotymentLoc=unique(OccTable$GroupId))
 ModelTable$ModelFormula='none'
@@ -602,10 +602,37 @@ ModelTable$Pres=0
 ModelTable$Abs=0
 ModelTable$WaldsSigVars='none'
 
+# Assuming that offset is akin to survey effort, if BND detection we are more certain (though not perfectly)
+# so the survey effort should be more than when there are not detections but less than when
+# there are FB detections
 
+# # Offset for FB detections should approach the offset for no detections 
+# OccTable_daily_wDetections$tempoffset=ifelse(OccTable_daily_wDetections$BNDTotOffset>0,
+#                                        .5-OccTable_daily_wDetections$BNDTotOffset,
+#                                        .5)
+# 
+# OccTable_daily_wDetections$tempoffset=(0.5001+(OccTable_daily_wDetections$BNDTotOffset-.5))
+# 
+# NewOcc=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==0,]
+# 
+# NewOcc$tempoffset=.5
+# 
+# NewOcc1=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==1,]
+# NewOcc1$tempoffset=1-NewOcc1$BNDTotOffset
+# NewOcc2=NewOcc1
+# NewOcc2$tempoffset=NewOcc2$BNDTotOffset
+# 
+# NewOcc_out=rbind(NewOcc, NewOcc1, NewOcc2)
+# NewOcc_out$tempoffset=inv.logit(NewOcc_out$tempoffset)
+
+
+OccTable_daily_wDetections$tempoffset=(ifelse(OccTable_daily_wDetections$OccAll==0,
+                                              1,
+                                              1+(1-OccTable_daily_wDetections$BNDTotOffset)))
 
 # list to store the models #
 modlist=list()
+
 
 
 # Model selection for ten variables
@@ -645,21 +672,21 @@ for(ii in 1:10){
   
   null=geeglm(OccAll~ShoreDist, 
               corstr = 'ar1', 
-              offset = BNDTotOffset, 
+              offset = tempoffset, 
               family = binomial, 
               id     = UnitLoc, 
               data   = data_sub) 
   
   mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
               corstr = 'ar1', 
-              offset  = BNDTotOffset, 
+              offset  = tempoffset, 
               family = binomial, 
               id     = UnitLoc, 
               data   = data_sub) 
   
   mod2=geeglm(OccAll~ShoreDist+JulienDay, 
               corstr = 'ar1', 
-              offset = BNDTotOffset, 
+              offset = tempoffset, 
               family = binomial, 
               id     = UnitLoc, 
               data   = data_sub) 
@@ -670,21 +697,21 @@ for(ii in 1:10){
     
     null=geeglm(OccAll~Year, 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                offset = tempoffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub) 
     
     mod1=geeglm(OccAll~Year+bs(JulienDay, knots = mean(JulienDay)), 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                offset = tempoffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub)
     
     mod2=geeglm(OccAll~Year+JulienDay, 
                 corstr = 'ar1', 
-                offset = BNDTotOffset, 
+                offset = tempoffset, 
                 family = binomial, 
                 id     = UnitLoc, 
                 data   = data_sub)
@@ -707,14 +734,14 @@ for(ii in 1:10){
   if(ii==6 |ii==5|ii==7){
     ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
                      corstr = 'ar1', 
-                     offset = BNDTotOffset, 
+                     offset = tempoffset, 
                      family = binomial, 
                      id     = UnitLoc, 
                      data   = data_sub)
   }else{
     ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
                      corstr = 'ar1', 
-                     offset = BNDTotOffset, 
+                     offset = tempoffset, 
                      family = binomial, 
                      id     = UnitLoc, 
                      data   = data_sub)
@@ -785,7 +812,7 @@ for(ii in 1:10){
   ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
   
   #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
-  ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)
+  ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)[2]
   
   # If covariates were retained then report them, otherwise fill in model table with N values
   if(is.character(tempmod)){
