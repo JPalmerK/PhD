@@ -1,6 +1,6 @@
-#############
-# Setup     #
-#############
+
+
+# 1) Load packages and functions ################################################################################
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
 rm(list=ls())
@@ -18,9 +18,7 @@ library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)
 
 
-###############################################
-# Functions #
-###############################################
+
 
 # Backwards stepwise selection
 SelectModel=function(ModelFull){
@@ -254,10 +252,9 @@ partialdf_factor=function(mod, data, variable){
   
 }
 
-################################################################################
-# General Data Prep #
-################################################################################
 
+
+# 2) Load and prep the data ################################################################
 
 OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
@@ -318,69 +315,15 @@ OccTable$SpeciesOffset[OccTable$SpeciesOffset>1]=0.5
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$BBOcc==1]=0.77
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$FBOcc==1]=0.06
 OccTable$SpeciesOffset[OccTable$SpeciesOffset==1 & OccTable$UNKOcc==1]=0.5
-#OccTable$SpeciesOffset[OccTable$SpeciesOffset==0] = 1
+
 
 OccTable$BNDTotOffset=(OccTable$BBOcc*.77+OccTable$FBOcc*.06+OccTable$UNKOcc*.5)/(OccTable$BBOcc+OccTable$FBOcc+OccTable$UNKOcc)
 
 # Set model variables to factors
-OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=1
+OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=0
 OccTable$Year=as.factor(OccTable$Year)
 OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
 
-
-#####################################################
-# Daily Occupancy #
-#####################################################
-# 
-# 
-# 
-# # Add total number of detections 
-# mm.bbtot=as.data.frame(aggregate(BBOcc~UnitLoc+Date, FUN=sum, data = OccTable))
-# colnames(mm.bbtot)[3]='BBTot'
-# mm.fbtot=as.data.frame(aggregate(FBOcc~UnitLoc+Date, FUN=sum, data = OccTable))
-# colnames(mm.fbtot)[3]='FBTot'
-# mm.unktot=as.data.frame(aggregate(UNKOcc~UnitLoc+Date, FUN=sum, data = OccTable))
-# colnames(mm.unktot)[3]='UNKTot'
-# 
-# 
-# mm=distinct(OccTable, Date, UnitLoc, JulienDay, GroupId, ShoreDist, Slope, Year,
-#             Month, IsCroFactor, Hr)
-# mm.bb=distinct(subset(OccTable, BBOcc>0), Date, BBOcc, UnitLoc)
-# mm.fb=distinct(subset(OccTable, FBOcc>0), Date, FBOcc, UnitLoc)
-# mm.unk=distinct(subset(OccTable, UNKOcc>0), Date, UNKOcc, UnitLoc)
-# 
-# 
-# OccTable_daily=merge(mm, mm.bb, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# OccTable_daily=merge(OccTable_daily, mm.fb, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# OccTable_daily=merge(OccTable_daily, mm.unk, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# 
-# OccTable_daily=merge(OccTable_daily, mm.bbtot, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# OccTable_daily=merge(OccTable_daily, mm.fbtot, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# OccTable_daily=merge(OccTable_daily, mm.unktot, by = c('Date', 'UnitLoc'), all.x = TRUE)
-# 
-# 
-# 
-# OccTable_daily[is.na(OccTable_daily)] <- 0
-# 
-# 
-# OccTable_daily$SpeciesOffset=OccTable_daily$BBOcc+OccTable_daily$FBOcc+OccTable_daily$UNKOcc
-# OccTable_daily$OccAll=ifelse(OccTable_daily$SpeciesOffset>=1,1,0)
-# 
-# 
-# # Species offset for Daily Occupancy
-# # If two species same day and same unit then uncertain
-# OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset>1]=0.5
-# OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$BBOcc==1]=0.77
-# OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$FBOcc==1]=0.06
-# OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$UNKOcc==1]=0.5
-# OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = 1
-# # Total offset
-# OccTable_daily$BNDTotOffset=(OccTable_daily$BBTot*.77+OccTable_daily$FBTot*.06+OccTable_daily$UNKTot*.5)/
-#   (OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
-# 
-# OccTable_daily$TotDet=(OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
-# 
-# OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=1
 
 rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
 
@@ -394,20 +337,12 @@ colnames(mm)[4]='SumHrlyDet'
 
 OccTable=merge(OccTable, mm, all.x=TRUE)
 OccTable_DPD=subset(OccTable, SumHrlyDet>0 )
+OccTable_DPD$BNDTotOffset=(ifelse(OccTable_DPD$OccAll==0,
+                                              1,
+                                              1+(1-OccTable_DPD$BNDTotOffset)))
 
 
-###########################################################################################################################
-# Model Fitting
-###########################################################################################################################
-
-# 1 Determine what form hour of day should take (linear offset, interaction or smooth)
-# 2 Do the same for tide height- also check factor or continuous
-# 3 Use backwards selection to get the model order
-
-
-#############################################################################################################################
-# 1) Determine what forms the covariates should take
-#############################################################################################################################
+# 3) Build the models for non-Cromarty ################################################################
 
 # An empty model is fitted: the binary response "OccAll" is modelled as a function of year, shore dist and GroupID only. These are expressed as B-splines with
 # one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date"
@@ -451,10 +386,10 @@ QIC(empty_Unit, empty_SlopeBS, empty_Slope, empty_GrupIdShoreDist)
 
 # # 
 # QIC
-# empty_Unit            14132.23
-# empty_SlopeBS         14172.34
-# empty_Slope           14168.87
-# empty_GrupIdShoreDist 14129.63 # WINNER
+# empty_Unit            13509.14
+# empty_SlopeBS         13543.49
+# empty_Slope           13538.92
+# empty_GrupIdShoreDist 13504.77 #winner
 
 
 empty= empty_GrupIdShoreDist
@@ -479,15 +414,11 @@ HoDs=geeglm(OccAll ~Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = 
 QIC(empty, HoDl, HoDs)
 
 # QIC
-# empty       14132.23
-# HoDl        14143.52
-# HoDs        13739.80 # winner
+# empty 13504.77
+# HoDl  13514.98
+# HoDs  13108.20 # winner
 
-
-#############################################################################################################################
-# 2) Determine what form tidal phase should take (linear offset, interaction or smooth)
-#############################################################################################################################
-
+# Determine what form tidal phase should take (linear offset, interaction or smooth)
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
 Tidel=geeglm(OccAll ~Year+ GroupId + ShoreDist+ HourAfterHigh,
              corstr = 'ar1',
@@ -529,17 +460,14 @@ QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 
 
 # QIC
-# empty       14129.63
-# TidesPh     14120.46
-# TideHeights 14151.58
-# TideHeithl  14112.86
-# Tides       14121.73
-# Tidel       14109.25 #Winner
+# empty       13504.77
+# TidesPh     13496.21
+# TideHeights 13526.39
+# TideHeithl  13489.89
+# Tides       13497.42
+# Tidel       13485.67 # winner
 
-#########################################################################################################################
-## 3 Use backwards QIC selection to get the model fit  ##
-#########################################################################################################################
-
+## 3 Use backwards QIC selection to get the model fit  
 ModelFull=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
                    UnitLoc + 
                    Year+
@@ -561,11 +489,7 @@ Model_dropped=DropVarsWalds(Model_out)
 CalcAUC(Model_dropped, data_sub=OccTable_DPD_nocro)
 
 
-##############################################################################################################
-# Create the Partial Plots #
-##############################################################################################################
-
-# Julien Date Smoothes #
+# 4) Plot the non-Cromarty Models ################################################################
 
 fitdf_Hour=partialDF(Model_dropped, OccTable_DPD_nocro, 'HourAfterPeakSolEle')
 fitdf_tide=partialDF(Model_dropped, OccTable_DPD_nocro, 'HourAfterHigh')
@@ -622,9 +546,7 @@ ggplot(data=fitdf_UnitLoc) +
 
 
 
-#################################################################################################
-# Repeat the Analysis for the Cromarty 5 location #
-##################################################################################################
+# 5) Build a model from Cromarty 05 ################################################################
 
 # 1 Whether hour of the day, Elevation or Julien Day given elevation is the most important
 # 2 Do the same for tide height- also check factor or continuous
@@ -633,11 +555,9 @@ ggplot(data=fitdf_UnitLoc) +
 
 
 
-##################################################################################################
 # Exploratory Analysis #
-##################################################################################################
 
-Cro_data=OccTable[OccTable$UnitLoc=='Cro_05',]
+Cro_data=OccTable_DPD[OccTable_DPD$UnitLoc=='Cro_05',]
 Cro_data=droplevels(Cro_data)
 Cro_data$elevationBin=cut(Cro_data$elevation, breaks = 12, labels = round(seq(min(Cro_data$elevation), max(Cro_data$elevation), length=12)))
 
@@ -651,9 +571,7 @@ ggplot(aggdata_elevation, aes(elevationBin, BBOcc, color=Year))+geom_point()
 
 
 
-#############################################################################################################################
 # 1) Determine what forms the covariates should take
-#############################################################################################################################
 
 # An empty model is fitted: the binary response "OccAll" is modelled as a function of year, shore dist and GroupID only. These are expressed as B-splines with
 # one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date"
@@ -690,14 +608,12 @@ HoDs=geeglm(OccAll ~Year + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSol
 QIC(empty, HoDl, HoDs)
 
 # QIC
-# empty 14132.230
-# HoDl   5896.878
-# HoDs   5889.971
+# empty 13504.766
+# HoDl   4606.496
+# HoDs   4602.937 #winner
 
 
-#############################################################################################################################
 # 2) Determine what form tidal phase should take (linear offset, interaction or smooth)
-#############################################################################################################################
 
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
 Tidel=geeglm(OccAll ~Year+ HourAfterHigh,
@@ -743,15 +659,23 @@ QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 # TidesPh      5895.536
 # TideHeights  5900.505
 # TideHeithl   5896.160
-# Tides        5894.389 # winner (barely)
+# Tides        5894.389
 # Tidel        5897.996
 
-# #########################################################################################################################
-# ## 3 Use backwards QIC selection to get the model fit  ##
-# #########################################################################################################################
+# empty       13504.766
+# TidesPh      4607.268
+# TideHeights  4612.737
+# TideHeithl   4606.535 # winner (barely)
+# Tides        4607.810
+# Tidel        4607.495
+
+
+
+
+## 3 Use backwards QIC selection to get the model fit  ##
 
 ModelFull=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
-                   bs(HourAfterHigh, knots = mean(HourAfterHigh)) +
+                   Z+
                    Year,
                  corstr = 'ar1',
                  family = binomial, # leave out constrains
@@ -763,26 +687,30 @@ Cro_Model_out=SelectModel(ModelFull)
 
 Cro_Model_sig=DropVarsWalds(Cro_Model_out)
 
-##############################################################################################################
-# Create the Partial Plots #
-##############################################################################################################
+CalcAUC(Cro_Model_sig, data_sub =Cro_data )
+
+# 6) Plot the Cromarty Model ################################################################
 
 # Aggregate the data for plotting
-aggdata_hour=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle, FUN=function(x){mean(x)/length(formula(Cro_Model_sig))}))
-aggdata_tide=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterHigh, FUN=function(x){mean(x)/length(formula(Cro_Model_sig))}))
-aggdata_tide$Nobs=aggregate(data=Cro_data, UnitLoc~HourAfterHigh, FUN=length)[2]
-aggdata_elevation=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle, FUN=function(x){mean(x)}))
+aggdata_hour=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
+                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
 
 
-aggdata_GroupId=data.frame(aggregate(data=Cro_data, BBOcc~GroupId, FUN=mean))
+aggdata_elevation=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
+                                       FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+
+aggdata_GroupId=data.frame(aggregate(data=Cro_data, SpeciesOffset~GroupId,
+                                     FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+
+Cro_data$TideCut=cut(x = Cro_data$Z, breaks =  quantile(Cro_data$Z, seq(0,1, by = .1)))
+aggdata_tide=data.frame(aggregate(data=Cro_data, SpeciesOffset~TideCut, 
+                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+aggdata_tide$Z=aggregate(data=Cro_data, Z~TideCut, FUN=median)[,2]
 
 
-#######################################################
-# Plot data #
-#######################################################
 
 
-fitdf_tide=partialDF(Cro_Model_sig, Cro_data, 'HourAfterHigh')
+fitdf_tide=partialDF(Cro_Model_sig, Cro_data, 'Z')
 fitdf_Year=partialdf_factor(Cro_Model_sig, Cro_data, 'Year')
 fitdf_ele=partialDF(Cro_Model_sig, Cro_data,'HourAfterPeakSolEle')
 fitdf_year=partialdf_factor(Cro_Model_sig, Cro_data, 'Year')
@@ -793,7 +721,7 @@ ggplot(data=fitdf_ele) +
   geom_line(aes(x=HourAfterPeakSolEle, y=y), size=1) +  
   geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_hour,
-             aes(x=HourAfterPeakSolEle, y=BBOcc)) +
+             aes(x=HourAfterPeakSolEle, y=SpeciesOffset)) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Detection Probability')
 
@@ -801,17 +729,17 @@ ggplot(data=fitdf_ele) +
 ggplot(data=fitdf_tide) +
   theme_bw()+
   scale_colour_manual(values=cbbPalette) +
-  geom_line(aes(x=HourAfterHigh, (y)), size=1) +  
-  geom_ribbon(aes(x=HourAfterHigh, ymin=(LCI), ymax=(UCI)),alpha=.2,linetype= 'blank') +
-  geom_point(data=aggdata_tide, aes(x=HourAfterHigh, y=(BBOcc))) +
+  geom_line(aes(x=Z, (y)), size=1) +  
+  geom_ribbon(aes(x=Z, ymin=(LCI), ymax=(UCI)),alpha=.2,linetype= 'blank') +
+  geom_point(data=aggdata_tide, aes(x=Z, y=(SpeciesOffset))) +
   xlab('Hour Relative High Tide') +
   ylab('Hour')
-
-ggplot(data=fitdf_year) +
-  theme_bw()+
-  scale_colour_manual(values=cbbPalette) +
-  geom_boxplot(aes(x=Year, y=inv.logit(vals)), size=1)
-
+# 
+# ggplot(data=fitdf_year) +
+#   theme_bw()+
+#   scale_colour_manual(values=cbbPalette) +
+#   geom_boxplot(aes(x=Year, y=inv.logit(vals)), size=1)
+# 
 
 
 
