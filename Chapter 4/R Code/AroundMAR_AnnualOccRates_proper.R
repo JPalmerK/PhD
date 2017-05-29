@@ -1,22 +1,22 @@
 #########################################################################
-# Descriptive Statistics For Occupancy#
+# Descriptive Statistics For Occupancy #
 #########################################################################
 
+# This code reads in the hourly occupancy table for dolphin detections and models
+# daily occupancy using GEEGLM's
 
+# 1)  Load packages, data, and declare local functions      ##############
 
-#############
-# Setup     #
-#############
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
-#rm(list=ls())
+rm(list=ls())
 library(boot)            # for inv.logit
 library(mgcv)
 library(ggplot2)
 library(lme4)
 library(dplyr)           # for distinct function 
 library(geepack)         # To make the GEE's
-#install_version("geepack", version = "1.0-7", repos = "http://cran.us.r-project.org")
+#install_version("geepack", version = "1.0-7", repos = "http://cran.us.r-project.org") for anova.gee, which is gone- Email Soren 5/24/2017
 library(splines)
 library(RColorBrewer)
 library(MuMIn)           # for QIC
@@ -63,33 +63,12 @@ meta_sub=subset(meta, select=c('UnitLoc', 'Slope2'))
 
 OccTable=merge(OccTable, meta_sub, all.x = TRUE)
 
-###############################################################################
-# Investigate colinearity between Shore Distance and Slope
-###############################################################################
-meta$ShoreDist=substr(meta$UnitLoc,5,6)
-
-boxplot(meta$Slope2~meta$ShoreDist)
-
-library(heplots) # for eta
-model.aov <- aov(Slope2 ~ ShoreDist, data = meta)
-summary(model.aov)
-etasq(model.aov, partial = FALSE)
-
-# Proportion of variance explained is .65
-# https://stats.stackexchange.com/questions/119835/correlation-between-a-nominal-iv-and-a-continuous-dv-variable
-
-rm(meta_sub, meta)
-
-
-
-# Functions  #########
+### Functions  
 
 # These function calculates do backwards stepwise QIC to select the best model,
 # then repeated Walds tests to retain meaningful variables and CalcAUC to caluclate
 # the area under the ROC curve for each fitted model. All code based on
 # Pirotta E, Matthiopoulos J, MacKenzie M, Scott-Hayward L, Rendell L Modelling sperm whale habitat preference: a novel approach combining transect and follow data
-
-AUC for the model (to access model fit) 
 
 SelectModel=function(ModelFull){
   
@@ -185,8 +164,6 @@ DropVarsWalds=function(ModelFull){
   return(NewModel)
 }
 
-
-
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
@@ -234,12 +211,97 @@ CalcAUC<-function(mod, data_sub){
   return(c(auc, pres, abs))
 }
 
+# functions to produce partial plots (largely based on MRSea, Scott-Hawyard)
+partialDF=function(mod, data, Variable){
+  
+  coefpos <- c(1, grep(Variable, colnames(model.matrix(mod))))
+  xvals <- data[, which(names(data) == Variable)]
+  newX <- seq(min(xvals), max(xvals), length = 500)
+  eval(parse(text = paste(Variable, "<- newX", 
+                          sep = "")))
+  response <- rep(1, 500)
+  newBasis <- eval(parse(text = labels(terms(mod))[grep(Variable, 
+                                                        labels(terms(mod)))]))
+  partialfit <- cbind(rep(1, 500), newBasis) %*% coef(mod)[coefpos]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == 
+                                      T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
+  }
+  rpreds <- cbind(rep(1, 500), newBasis) %*% t(rcoefs[, 
+                                                      coefpos])
+  quant.func <- function(x) {
+    quantile(x, probs = c(0.025, 0.975))
+  }
+  cis <- t(apply(rpreds, 1, quant.func))
+  
+  partialfit <- mod$family$linkinv(partialfit)
+  cis <- mod$family$linkinv(cis)
+  
+  fitdf=data.frame(x=newX, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
+  colnames(fitdf)[1]=Variable
+  return(fitdf)
+}
+
+partialdf_factor=function(mod, data, variable){
+  coeffac <- c(1,grep(variable, colnames(model.matrix(mod))))
+  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
+  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
+  xvals <- data[, which(names(data) == variable)]
+  newX <- sort(unique(xvals))
+  newX <- newX[2:length(newX)]
+  partialfit <- coef(mod)[c(coefpos)]
+  rcoefs <- NULL
+  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
+      silent = T)
+  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
+    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
+  }
+  
+  if((length(coefpos))>1){
+    
+    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
+    fitdf_year=data.frame(vals=rpreds[,1])
+    fitdf_year$FactorVariable=as.factor(paste(variable, levels(xvals)[1], sep = ''))
+    
+    ############################
+    # Recompile for plotting #
+    #############################
+    
+    
+    for(jj in 2:ncol(rpreds)){
+      temp=data.frame(vals=rpreds[,jj])
+      temp$FactorVariable=as.factor(colnames(rpreds)[jj])
+      fitdf_year=rbind(fitdf_year, temp)
+      rm(temp)
+    }
+    
+  }else{
+    
+    rpreds <- rcoefs[,coefpos]
+    fitdf_year=data.frame(vals=rpreds)
+    fitdf_year$FactorVariable=colnames(model.matrix(mod))[coefpos[2:length(coefpos)]]
+    
+  }
+  
+  fitdf=fitdf_year
+  colnames(fitdf)[2]=variable
+  
+  return(fitdf)
+  
+  
+}
 
 
 
-################################################################################
-# General Data Prep #
-################################################################################
+# 2)  Data Prep #################################################################################
+
+# This section processes the hourly occupancy table to correct level orders (GroupID and UnitLoc)
+# Hourly Bottlenose dolphin offsets are delcared where offset represnts probability that a click detection
+# (OccAll) was produced by a broadband species. If only frequency banded clicks, P(BND)=0.06 if Broadband
+# clicks P(BND)=0.77 and if unknown clicks P(BND)=0.50
 
 OccTable$GroupId=unlist(strsplit(as.character(OccTable$UnitLoc), split = "_"))[seq(1,(nrow(OccTable)*2)-1,2)]
 
@@ -249,12 +311,6 @@ level_names=c( "Lat", "Hel", "Cro",
                "Stb")
 
 OccTable$GroupId=factor(OccTable$GroupId, levels=level_names)
-
-
-
-#OccTable$ShoreDist=unlist(strsplit(as.character(OccTable$UnitLoc), split = "_"))[seq(2,(nrow(OccTable)*2),2)]
-
-
 OccTable$JD_scale=scale(OccTable$JulienDay)
 
 OccTable$FBOcc[is.na(OccTable$FBOcc)]=0
@@ -276,10 +332,15 @@ OccTable$BNDTotOffset=(OccTable$BBOcc*.77+OccTable$FBOcc*.06+OccTable$UNKOcc*.5)
 
 OccTable$BNDTotOffset[is.nan(OccTable$BNDTotOffset)]=1
 
-#####################################################
-# Daily Occupancy #
-#####################################################
 
+# 2a) Aggregate hourly Detections into Daily Occupancy table ######################################################
+
+# This section of code aggregates the hourly occupancy into daily occupancy and
+# Assigns BND offset scores to each day indicating the probability that on any given day,
+# There was a bottlenose dolphin in the detections
+
+# Offset scores where multiple species present calculated using a weighted average of the hourly 
+# detection scores.(Next iteration migh consider likelihood ratios instead, but enough stuff to deal with at present)
 
 
 # Add total number of detections 
@@ -306,16 +367,12 @@ OccTable_daily=merge(OccTable_daily, mm.fbtot, by = c('Date', 'UnitLoc'), all.x 
 OccTable_daily=merge(OccTable_daily, mm.unktot, by = c('Date', 'UnitLoc'), all.x = TRUE)
 
 
-
+# Set NA scores to 0
 OccTable_daily[is.na(OccTable_daily)] <- 0
-
 
 
 OccTable_daily$SpeciesOffset=OccTable_daily$BBOcc+OccTable_daily$FBOcc+OccTable_daily$UNKOcc
 OccTable_daily$OccAll=ifelse(OccTable_daily$SpeciesOffset>=1,1,0)
-
-
-
 
 # Species offset for Daily Occupancy
 # If two species same day and same unit then uncertain
@@ -336,10 +393,24 @@ OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=1
 rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
 
 
-###############################################################################
-# Data Exploration/Viz #
-##############################################################################
+# 3)  Data Exploration/Viz ################################################################################
 
+# Much of this was done elsewhere, cursory exploration of colinearity between deployment distance from
+# shore factor(ShoreDist) and the slope of the bathymetry. 
+
+meta$ShoreDist=substr(meta$UnitLoc,5,6)
+
+boxplot(meta$Slope2~meta$ShoreDist)
+
+library(heplots) # for eta
+model.aov <- aov(Slope2 ~ ShoreDist, data = meta)
+summary(model.aov)
+etasq(model.aov, partial = FALSE)
+
+# Proportion of variance explained is .65
+# https://stats.stackexchange.com/questions/119835/correlation-between-a-nominal-iv-and-a-continuous-dv-variable
+
+rm(meta_sub, meta)
 
 # Bin the data for visualisation #
 OccTable_daily$DayBin=cut(OccTable_daily$JulienDay, breaks=20)
@@ -364,13 +435,12 @@ ggplot(data=mm, aes(x=med, y=BBOcc, color=ShoreDist)) +
   ylab('Detection Probability') +
   ggtitle('BND Occupancy')
 
+rm(mm)
 
 
+# 4)  Make Chapter tables for Overall Occupancy Rates ##################################################################################
 
-#################################################################################
-# Table For Number of Detections at Each Unit Loc #
-#################################################################################
-
+# Table for proportion of days occupied
 Basic_table=aggregate(data=subset(OccTable_daily, Year==2013), OccAll~UnitLoc, FUN=sum)
 temp1=aggregate(data=subset(OccTable_daily, Year==2014), OccAll~UnitLoc, FUN=sum)
 temp2=aggregate(data=subset(OccTable_daily, Year==2015), OccAll~UnitLoc, FUN=sum)
@@ -420,9 +490,7 @@ Basic_table$BinConf2015U=binconf(x=Basic_table$NDetections2015, n = Basic_table$
   
 # write.csv(Basic_table, 'W:/KJP PHD/4-Bayesian Habitat Use/Figures/Basic Ocuppancy 2013-2015.csv')
 
-##################################################################################
-# Basic Table for BND Trains #
-##################################################################################
+# Table for BND occupancy  #
 
 Basic_table_bb=aggregate(data=subset(OccTable_daily, Year==2013), BBOcc~UnitLoc, FUN=sum)
 temp1=aggregate(data=subset(OccTable_daily, Year==2014), BBOcc~UnitLoc, FUN=sum)
@@ -474,25 +542,21 @@ Basic_table_bb$BinConf2015U=binconf(x=Basic_table_bb$NDetections2015, n = Basic_
 
 
 
-#################################################################################
-# Select Days with Detections #
-#################################################################################
 
+# 5) Final pre-processing-include only units with some detections in modelling process ###
 
+## Finaslf ##
 OccTable_daily$YrUnitLoc=paste(OccTable_daily$UnitLoc, OccTable_daily$Year, sep='')
 
 OccTable_daily_wDetections= OccTable_daily[OccTable_daily$YrUnitLoc %in%
                                              names(which(tapply(OccTable_daily$OccAll,OccTable_daily$YrUnitLoc,sum)>1)),]
-
-
 OccTable_daily_wDetections=droplevels(OccTable_daily_wDetections)
 
 
 
 
-###############################################################################
-# Visualise the daily autocorrelation #
-###############################################################################
+# 5)  Visualise the daily autocorrelation for all units ################################################################################
+
 
 data_detections=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==1,]
 data_detections=data_detections[order(data_detections$UnitLoc, data_detections$JulienDay),]
@@ -514,6 +578,14 @@ ggplot(data_detections, aes(x=DiffDays, fill=as.factor(ShoreDist))) +
   theme_minimal()
 
   
+
+
+
+
+
+# 6)  Fit Models and Predictions (make sure to load predictvcv first!) #########################################################
+
+ 
 # Table to store model performance #
 ModelTable=data.frame(DeplotymentLoc=unique(OccTable$GroupId))
 ModelTable$ModelFormula='none'
@@ -529,14 +601,6 @@ ModelTable$AUC=0
 ModelTable$Pres=0
 ModelTable$Abs=0
 ModelTable$WaldsSigVars='none'
-
-
-
-
-
-# Fit Models and Predictions #########################################################
-
- 
 
 
 
@@ -634,10 +698,11 @@ for(ii in 1:10){
     JdateForm='JulienDay'
   }
   
-  #############################################################################################
-  # Fit the Models and do backwards AIC  #
-  #############################################################################################
   
+  # Fit the Models and do backwards AIC- issue with correlation structure for some units,
+  # 'seems' to have *magically* resolved itself. But retaining logical statement for when it 
+  # *magically* returns. 
+
   
   if(ii==6 |ii==5|ii==7){
     ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
@@ -715,13 +780,14 @@ for(ii in 1:10){
     AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
   }
   
-  
+  # Retained formula and correlation structure 
   ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
   ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
   
   #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
   ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)
   
+  # If covariates were retained then report them, otherwise fill in model table with N values
   if(is.character(tempmod)){
     ModelTable$AUC[ii]='NA'
     ModelTable$Pres[ii]='NA'
@@ -733,7 +799,8 @@ for(ii in 1:10){
     ModelTable$Abs[ii]=round(AUCvals[3],2)
   }
   
-  
+  # Do some house keeping
+  rm(null, mod1, mod2, ModelFull, tempmod, newdat_perdOnly, OneYearAggs, data_sub, AUCvals)
   
 }
 
@@ -784,94 +851,7 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
   
 
 
-##################################################################
-# Get the Partial Plots for each plot Group ID               #
-##################################################################
-
-# Functions for calculating partial contributions for
-# factors and continuous variables 
-partialDF=function(mod, data, Variable){
-  
-  coefpos <- c(1, grep(Variable, colnames(model.matrix(mod))))
-  xvals <- data[, which(names(data) == Variable)]
-  newX <- seq(min(xvals), max(xvals), length = 500)
-  eval(parse(text = paste(Variable, "<- newX", 
-                          sep = "")))
-  response <- rep(1, 500)
-  newBasis <- eval(parse(text = labels(terms(mod))[grep(Variable, 
-                                                        labels(terms(mod)))]))
-  partialfit <- cbind(rep(1, 500), newBasis) %*% coef(mod)[coefpos]
-  rcoefs <- NULL
-  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
-      silent = T)
-  if (is.null(rcoefs) || length(which(is.na(rcoefs) == 
-                                      T)) > 0) {
-    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
-  }
-  rpreds <- cbind(rep(1, 500), newBasis) %*% t(rcoefs[, 
-                                                      coefpos])
-  quant.func <- function(x) {
-    quantile(x, probs = c(0.025, 0.975))
-  }
-  cis <- t(apply(rpreds, 1, quant.func))
-  
-  partialfit <- mod$family$linkinv(partialfit)
-  cis <- mod$family$linkinv(cis)
-  
-  fitdf=data.frame(x=newX, y=partialfit, LCI=cis[,1], UCI=cis[,2]) 
-  colnames(fitdf)[1]=Variable
-  return(fitdf)
-}
-
-
-partialdf_factor=function(mod, data, variable){
-  coeffac <- c(1,grep(variable, colnames(model.matrix(mod))))
-  coefradial <- c(grep("LocalRadialFunction", colnames(model.matrix(mod))))
-  coefpos <- coeffac[which(is.na(match(coeffac, coefradial)))]
-  xvals <- data[, which(names(data) == variable)]
-  newX <- sort(unique(xvals))
-  newX <- newX[2:length(newX)]
-  partialfit <- coef(mod)[c(coefpos)]
-  rcoefs <- NULL
-  try(rcoefs <- rmvnorm(1000, coef(mod), summary(mod)$cov.scaled), 
-      silent = T)
-  if (is.null(rcoefs) || length(which(is.na(rcoefs) == T)) > 0) {
-    rcoefs <- rmvnorm(1000, coef(mod), as.matrix(nearPD(summary(mod)$cov.scaled)$mat))
-  }
-  
-  if((length(coefpos))>1){
-    
-    rpreds <- as.data.frame(rcoefs[, c(coefpos)])
-    BootstrapCoefs3=data.frame(vals=rpreds[,1])
-    BootstrapCoefs3$FactorVariable=as.factor(paste(variable, levels(xvals)[1], sep = ''))
-    
-    ############################
-    # Recompile for plotting #
-    #############################
-    
-    
-    for(jj in 2:ncol(rpreds)){
-      temp=data.frame(vals=rpreds[,jj])
-      temp$FactorVariable=as.factor(colnames(rpreds)[jj])
-      BootstrapCoefs3=rbind(BootstrapCoefs3, temp)
-      rm(temp)
-    }
-    
-  }else{
-    
-    rpreds <- rcoefs[,coefpos]
-    BootstrapCoefs3=data.frame(vals=rpreds)
-    BootstrapCoefs3$FactorVariable=colnames(model.matrix(mod))[coefpos[2:length(coefpos)]]
-
-  }
-  
-  fitdf=BootstrapCoefs3
-  colnames(fitdf)[2]=variable
- 
-  return(fitdf)
-  
-  
-}
+# 7)  Make Partial plots for QIC selected Models ##################################################################
 
 
 # Plot Storage
@@ -879,7 +859,7 @@ p=list()
 Sd_P=list()
 Yr_P=list()
 
-# Visualise partial plots with data
+# Make partial plots for all deployment groups
 for(ii in 1:10){
   
   # Again subset the data
@@ -932,40 +912,40 @@ for(ii in 1:10){
   
   if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'ShoreDist'))>0){
     
-    BootstrapCoefs2=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
-    BootstrapCoefs2$GroupId=data_sub$GroupId[1]
+    fitdf_shoredist=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
+    fitdf_shoredist$GroupId=data_sub$GroupId[1]
     
   
     }else{
-    BootstrapCoefs2=data.frame(ShoreDist=factor(c('ShoreDist05','ShoreDist10','ShoreDist15')), 
+    fitdf_shoredist=data.frame(ShoreDist=factor(c('ShoreDist05','ShoreDist10','ShoreDist15')), 
                            vals=NaN,
                            GroupId=data_sub$GroupId[1])
   }
   
 
   
-  ggplot(BootstrapCoefs2, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
+  ggplot(fitdf_shoredist, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
   
   #######################################################
   # Year as Factors #
   #######################################################
 
  if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'Year'))>0){
-     BootstrapCoefs3 = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
-     BootstrapCoefs3$GroupId=data_sub$GroupId[1]
+     fitdf_year = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
+     fitdf_year$GroupId=data_sub$GroupId[1]
      
    }else{
-     BootstrapCoefs3=data.frame(Year=factor(c('Year2013','Year2014','Year2015')), 
+     fitdf_year=data.frame(Year=factor(c('Year2013','Year2014','Year2015')), 
                                 vals=NaN,
                                 GroupId=data_sub$GroupId[1])}
-  ggplot(BootstrapCoefs3, aes(x=Year, y=inv.logit(vals)))+geom_violin()
+  ggplot(fitdf_year, aes(x=Year, y=inv.logit(vals)))+geom_violin()
   
   
 
 
 
   
-   Yr_P[[ii]]=ggplot(BootstrapCoefs3, aes(x=Year, y=vals)) +
+   Yr_P[[ii]]=ggplot(fitdf_year, aes(x=Year, y=vals)) +
      geom_boxplot() +
      theme_minimal()+
      ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
@@ -982,15 +962,15 @@ for(ii in 1:10){
   
   if(ii==1){
     fitdf_jdate_out=fitdf_jdate
-    fitdf_shoredist_out=BootstrapCoefs2
-    fitdf_Year_out=BootstrapCoefs3
+    fitdf_shoredist_out=fitdf_shoredist
+    fitdf_Year_out=fitdf_year
     
     AggData=OneYearAggs
     
   }else {
     fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
-    fitdf_shoredist_out=rbind(fitdf_shoredist_out, BootstrapCoefs2)
-    fitdf_Year_out=rbind(fitdf_Year_out, BootstrapCoefs3)
+    fitdf_shoredist_out=rbind(fitdf_shoredist_out, fitdf_shoredist)
+    fitdf_Year_out=rbind(fitdf_Year_out, fitdf_year)
     
     AggData=rbind(AggData, OneYearAggs)
   }
@@ -1057,18 +1037,5 @@ ggplot(data=fitdf_Year_out) +
 
 
 
-################################################################################
-# Occupancy rate seems to be correlated with AUC scores indicating that the models need
-# more detections in order to fit
-# Run Mann-Whiteney U test to determine if that's the case
-###############################################################################
 
-Group_OccRates=aggregate(data=OccTable_daily_wDetections, BBOcc~GroupId, FUN=mean)
-Group_OccRates$OccOrder=order(Group_OccRates$BBOcc)
-Group_OccRates$AucOrder=order(ModelTable$AUC)
-
-x=c(ModelTable$AUC, Group_OccRates$BBOcc)
-g=as.factor(c(rep('AUC',10),rep('OccRate',10)))
-
-wilcox.test(x ~ g) 
 
