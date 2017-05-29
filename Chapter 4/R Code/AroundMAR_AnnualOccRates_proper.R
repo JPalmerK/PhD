@@ -80,12 +80,112 @@ etasq(model.aov, partial = FALSE)
 
 rm(meta_sub, meta)
 
-################################################################################
-# Function to calculate AUC #
-################################################################################
 
-# This function calculates AUC for the model (to access model fit) taken from  
+
+# Functions  #########
+
+# These function calculates do backwards stepwise QIC to select the best model,
+# then repeated Walds tests to retain meaningful variables and CalcAUC to caluclate
+# the area under the ROC curve for each fitted model. All code based on
 # Pirotta E, Matthiopoulos J, MacKenzie M, Scott-Hayward L, Rendell L Modelling sperm whale habitat preference: a novel approach combining transect and follow data
+
+AUC for the model (to access model fit) 
+
+SelectModel=function(ModelFull){
+  
+  # Calculate the QIC of the full model
+  fullmodQ=QIC(ModelFull)
+  newQIC=0
+  terms=attr(ModelFull$terms,"term.labels")
+  
+  
+  while(newQIC != fullmodQ & length(terms)>1){
+    
+    
+    # get all the terms for the full model
+    terms <- attr(ModelFull$terms,"term.labels")
+    n=length(terms)
+    
+    newmodel=list()
+    newQIC=list()
+    
+    newmodel[[1]]=ModelFull
+    newQIC[[1]]=fullmodQ
+    
+    # Make n models with selection
+    for (ii in 1:n){
+      dropvar=terms[ii]
+      newTerms <- terms[-match(dropvar,terms)]
+      newform <- as.formula(paste(".~.-",dropvar))
+      newmodel[[ii+1]] <- update(ModelFull,newform)
+      newQIC[[ii+1]] =QIC(newmodel[[ii]])
+      
+    }
+    
+    # Get the model with the lowest QIC
+    LowestMod=which.min(unlist(newQIC))
+    
+    if (LowestMod != 1){
+      ModelFull=newmodel[[LowestMod]]
+      newQIC=min(unlist(newQIC))
+    } else {
+      ModelFull=ModelFull
+      newQIC=min(unlist(newQIC))
+    }
+    
+    
+    #end the model selection
+    
+    
+  }
+  return(ModelFull)
+  
+}
+
+DropVarsWalds=function(ModelFull){
+  
+  # If no terms included return 
+  if (length(attr(ModelFull$terms,"term.labels"))<2){
+    NewModel='No Covariates to select from'
+    
+  }else{
+    
+    
+    OldModel=ModelFull
+    # Get the anova values
+    temp=anova(ModelFull)
+    
+    # Make n models with selection
+    while(length(which(temp$`P(>|Chi|)`>.05))>0 & is.data.frame(temp)){
+      
+      
+      # get the maximum value
+      dropvar=rownames(temp)[which.max(temp$`P(>|Chi|)`)]
+      
+      # new formula for the full model
+      newform <- as.formula(paste(".~.-",dropvar))
+      
+      # new full model
+      ModelFull= update(ModelFull,newform) 
+      
+      # Get the model covariate names
+      terms <- attr(ModelFull$terms,"term.labels")
+      
+      # # Get the anova values
+      # temp=anova(ModelFull)
+      
+      temp=tryCatch({anova(ModelFull)}, error=function(e){e})
+      
+      
+    }
+    
+    NewModel=ModelFull
+  }
+  
+  return(NewModel)
+}
+
+
 
 CalcAUC<-function(mod, data_sub){
   
@@ -133,6 +233,8 @@ CalcAUC<-function(mod, data_sub){
   
   return(c(auc, pres, abs))
 }
+
+
 
 
 ################################################################################
@@ -430,106 +532,10 @@ ModelTable$WaldsSigVars='none'
 
 
 
-# Functions  ##
 
 
-SelectModel=function(ModelFull){
-  
-  # Calculate the QIC of the full model
-  fullmodQ=QIC(ModelFull)
-  newQIC=0
-  terms=attr(ModelFull$terms,"term.labels")
+# Fit Models and Predictions #########################################################
 
-  
-  while(newQIC != fullmodQ & length(terms)>1){
-    
-  
-  # get all the terms for the full model
-  terms <- attr(ModelFull$terms,"term.labels")
-  n=length(terms)
-  
-  newmodel=list()
-  newQIC=list()
-  
-  newmodel[[1]]=ModelFull
-  newQIC[[1]]=fullmodQ
-  
-  # Make n models with selection
-  for (ii in 1:n){
-    dropvar=terms[ii]
-    newTerms <- terms[-match(dropvar,terms)]
-    newform <- as.formula(paste(".~.-",dropvar))
-    newmodel[[ii+1]] <- update(ModelFull,newform)
-    newQIC[[ii+1]] =QIC(newmodel[[ii]])
-    
-  }
-  
-  # Get the model with the lowest QIC
-  LowestMod=which.min(unlist(newQIC))
-  
-  if (LowestMod != 1){
-    ModelFull=newmodel[[LowestMod]]
-    newQIC=min(unlist(newQIC))
-  } else {
-    ModelFull=ModelFull
-    newQIC=min(unlist(newQIC))
-  }
-
-  
-  #end the model selection
-
-
-    }
-  return(ModelFull)
-
-  }
-
-DropVarsWalds=function(ModelFull){
-  
-  # If no terms included return 
-  if (length(attr(ModelFull$terms,"term.labels"))<2){
-    NewModel='No Covariates to select from'
-  
-    }else{
-  
-  
-  OldModel=ModelFull
-  # Get the anova values
-  temp=anova(ModelFull)
-  
-  # Make n models with selection
-  while(length(which(temp$`P(>|Chi|)`>.05))>0 & is.data.frame(temp)){
-    
-      
-      # get the maximum value
-      dropvar=rownames(temp)[which.max(temp$`P(>|Chi|)`)]
-      
-      # new formula for the full model
-      newform <- as.formula(paste(".~.-",dropvar))
-      
-      # new full model
-      ModelFull= update(ModelFull,newform) 
-      
-     # Get the model covariate names
-     terms <- attr(ModelFull$terms,"term.labels")
-     
-     # # Get the anova values
-     # temp=anova(ModelFull)
-     
-     temp=tryCatch({anova(ModelFull)}, error=function(e){e})
-     
-
-  }
-  
-  NewModel=ModelFull
-    }
-  
-  return(NewModel)
-}
-
-########################################################
-# Fit Models and Predictions #
-#######################################################
  
 
 
