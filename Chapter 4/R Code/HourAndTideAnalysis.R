@@ -1,4 +1,4 @@
-
+# This code undertakes model selection for the sub-daily occupancy analysis
 
 # 1) Load packages and functions ################################################################################
 # This code investigates the various models that look at the different occupancy distributions
@@ -338,8 +338,8 @@ colnames(mm)[4]='SumHrlyDet'
 OccTable=merge(OccTable, mm, all.x=TRUE)
 OccTable_DPD=subset(OccTable, SumHrlyDet>0 )
 OccTable_DPD$BNDTotOffset=(ifelse(OccTable_DPD$OccAll==0,
-                                              1,
-                                              1+(1-OccTable_DPD$BNDTotOffset)))
+                                              0,
+                                              (1-OccTable_DPD$BNDTotOffset)))
 
 
 # 3) Build the models for non-Cromarty ################################################################
@@ -580,7 +580,7 @@ ggplot(aggdata_elevation, aes(elevationBin, BBOcc, color=Year))+geom_point()
 
 
 ## Test linear or smooth for hour of day 
-Empty=geeglm(OccAll ~Year,
+empty=geeglm(OccAll ~Year,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
@@ -655,13 +655,6 @@ TidesPh=geeglm(OccAll ~Year+ Phase,
 QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 
 # QIC
-# empty       14132.230
-# TidesPh      5895.536
-# TideHeights  5900.505
-# TideHeithl   5896.160
-# Tides        5894.389
-# Tidel        5897.996
-
 # empty       13504.766
 # TidesPh      4607.268
 # TideHeights  4612.737
@@ -693,18 +686,18 @@ CalcAUC(Cro_Model_sig, data_sub =Cro_data )
 
 # Aggregate the data for plotting
 aggdata_hour=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
-                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
 
 aggdata_elevation=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
-                                       FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+                                       FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
 aggdata_GroupId=data.frame(aggregate(data=Cro_data, SpeciesOffset~GroupId,
-                                     FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+                                     FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
 Cro_data$TideCut=cut(x = Cro_data$Z, breaks =  quantile(Cro_data$Z, seq(0,1, by = .1)))
 aggdata_tide=data.frame(aggregate(data=Cro_data, SpeciesOffset~TideCut, 
-                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig))-1)}))
+                                  FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 aggdata_tide$Z=aggregate(data=Cro_data, Z~TideCut, FUN=median)[,2]
 
 

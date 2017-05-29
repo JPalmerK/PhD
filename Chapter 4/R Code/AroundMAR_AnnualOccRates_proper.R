@@ -627,8 +627,8 @@ ModelTable$WaldsSigVars='none'
 
 
 OccTable_daily_wDetections$tempoffset=(ifelse(OccTable_daily_wDetections$OccAll==0,
-                                              1,
-                                              1+(1-OccTable_daily_wDetections$BNDTotOffset)))
+                                              0,
+                                              (1-OccTable_daily_wDetections$BNDTotOffset)))
 
 # list to store the models #
 modlist=list()
