@@ -294,6 +294,10 @@ partialdf_factor=function(mod, data, variable){
   
 }
 
+# colorblind palette with black for plotting
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
 
 
 # 2)  Data Prep #################################################################################
@@ -568,14 +572,18 @@ for(ii in 1:length(unique(data_detections$UnitLoc))){
 }
 
 data_detections$DiffDays[data_detections$DiffDays>80]=0
-
+data_detections
 # Interleaved histograms
-ggplot(data_detections, aes(x=DiffDays, fill=as.factor(ShoreDist))) +
+
+ggplot(data_detections, aes(x=DiffDays, fill=ShoreDist)) +
+  scale_fill_discrete(name="Shore Distance",
+                      labels=c("Near", "Mid", "Off"))+
   facet_wrap(~GroupId) +
+  scale_fill_manual(values=cbbPalette) +
   geom_histogram(binwidth=.5, position="dodge") +
   ylim(0,20) +
-  xlim(0, 30) +
-  theme_minimal()
+  xlim(0, 30) + 
+  theme_bw()
 
   
 
@@ -620,6 +628,9 @@ OccTable_daily_wDetections$tempoffset=(ifelse(OccTable_daily_wDetections$OccAll=
 # list to store the models #
 modlist=list()
 
+# List to store the signficant models
+modsig=list()
+
 
 
 # Model selection for ten variables
@@ -636,13 +647,7 @@ for(ii in 1:10){
   ModelTable$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
   
   newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','BNDTotOffset'))
-  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
-                              OccAll=0,
-                              ShoreDist=factor(unique(newdat$ShoreDist)),
-                              GroupId=unique(newdat$GroupId),
-                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=mean)[,2]),1])
-  
-  
+
   tryCatch({
     ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
   
@@ -653,9 +658,9 @@ for(ii in 1:10){
   tryCatch({
     ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
   
-  ##########################################################################################
+ 
   # Determine whether linear model or spline for Julien Day #
-  #########################################################################################
+
   
   null=geeglm(OccAll~ShoreDist, 
               corstr = 'ar1', 
@@ -712,32 +717,20 @@ for(ii in 1:10){
     JdateForm='JulienDay'
   }
   
-  
-  # Fit the Models and do backwards AIC- issue with correlation structure for some units,
-  # 'seems' to have *magically* resolved itself. But retaining logical statement for when it 
-  # *magically* returns. 
 
-  
-  if(ii==6 |ii==5|ii==7){
-    ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+  ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
                      corstr = 'ar1', 
                      offset = tempoffset, 
                      family = binomial, 
                      id     = UnitLoc, 
                      data   = data_sub)
-  }else{
-    ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                     corstr = 'ar1', 
-                     offset = tempoffset, 
-                     family = binomial, 
-                     id     = UnitLoc, 
-                     data   = data_sub)
-  }
-  
-  
+
+
   # Bakcwards selection for QIC
   modlist[[ii]]=SelectModel(ModelFull)
   
+  # Document the formula
+  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))
   
   # The Data are too sparse to support removal of unsignifcant terms
   # However, significant terms can be displayed
@@ -745,80 +738,97 @@ for(ii in 1:10){
   # Walds test function to remove unsignificant terms
   tempmod=DropVarsWalds(modlist[[ii]])
   
+  # store the mode
+  modsig[[ii]]=tempmod
+  
+  
   if(is.character(tempmod)){
     ModelTable$WaldsSigVars[ii]=tempmod
-  }else{
-    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
-  }
-  
-  
-  
-  newdat_perdOnly=expand.grid(JulienDay=seq(min(newdat$JulienDay), max(newdat$JulienDay)),
-                              OccAll=0,
-                              ShoreDist=factor(unique(newdat$ShoreDist)),
-                              GroupId=unique(newdat$GroupId),
-                              Year=aggregate(data=data_sub, BBOcc~Year, FUN=mean)[ which.max(aggregate(data=data_sub, BBOcc~Year, FUN=length)[,2]),1])
-  
-  
-  
-  
-  # Create Aggregated data for plotting
-  OneYearAggs=data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
-                                   OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
-  OneYearAggs=cbind(OneYearAggs,
-                    aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)), 
-                              JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
-  
-  OneYearAggs=cbind(OneYearAggs,
-                    data.frame(aggregate(data=subset(data_sub, Year==unique(newdat_perdOnly$Year)),
-                                   BNDTotOffset~DayBin+GroupId+ShoreDist, FUN=mean))[,4])
-  
-  
-  colnames(OneYearAggs)[5]=c('med')
-  colnames(OneYearAggs)[4]='OccAll'
-  colnames(OneYearAggs)[6]='BNDTotOffset'
-  
-  
-  OneYearAggs$JulienDay=OneYearAggs$med
-  OneYearAggs$Year=unique(newdat_perdOnly$Year)
-  
-  if(ii==1){
-    fit=cbind(newdat,  predictvcv(modlist[[ii]]))
-    dummyfit=cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly))
-    AggData=cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs))
     
-    
-  }else {
-    fit=rbind(fit, cbind(newdat, predictvcv(modlist[[ii]])) )
-    dummyfit=rbind(dummyfit,cbind(newdat_perdOnly, predictvcv(modlist[[ii]], newdata = newdat_perdOnly)))
-    AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(modlist[[ii]], newdata = OneYearAggs)))
-  }
-  
-  # Retained formula and correlation structure 
-  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))  
-  ModelTable$CorrStuct[ii]=modlist[[ii]]$corstr
-  
-  #Calculate conditional and marginal coefficient of determination for Generalized mixed-effect models (R_GLMM²).
-  ModelTable$RsquaredAdj[ii]=round(r.squaredGLMM(modlist[[ii]]),2)[2]
-  
-  # If covariates were retained then report them, otherwise fill in model table with N values
-  if(is.character(tempmod)){
+    # If covariates were retained then report them, otherwise fill in model table with N values
     ModelTable$AUC[ii]='NA'
     ModelTable$Pres[ii]='NA'
     ModelTable$Abs[ii]='NA'
+  
   }else{
-    AUCvals=CalcAUC(modlist[[ii]], data_sub = data_sub)
+    
+    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
+    
+    terms_orig=attr(tempmod$terms,"term.labels")
+    terms_idx= grep('JulienDay', terms_orig)
+    terms=terms_orig
+    
+    # If Julien day present in the model replace it for aggregating
+    if(length(grep('JulienDay', terms_orig))>0){
+      terms[terms_idx]='DayBin'
+    }
+    rm(terms_idx)
+    
+    
+    # Expand terms
+    
+    if(length(grep('JulienDay', terms_orig))>0){jday=seq(min(newdat$JulienDay), max(newdat$JulienDay))
+    }else{
+      jday=median(newdat$JulienDay)}
+    
+    if(length(grep('Year', terms_orig))>0){Year=data_sub$Year[1]}else{
+      Year=unique(data_sub$Year)}
+    
+    if(length(grep('ShoreDist', terms_orig))>0){ShoreDist=data_sub$ShoreDist[1]}else{
+      ShoreDist=unique(data_sub$ShoreDist)}
+      
+      
+    # Make new prediction grid using the terms from the model
+    newdat_perdOnly=expand.grid(JulienDay=jday, Year=Year, ShoreDist=ShoreDist, GroupId=unique(newdat$GroupId),OccAll=0)
+    
+    
+    # Aggregated data for plotting
+    form=as.formula(paste('OccAll ~', paste(terms, collapse=" + ")))
+    form1=as.formula(paste('JulienDay ~', paste(terms, collapse=" + ")))
+    form2=as.formula(paste('BNDTotOffset ~', paste(terms, collapse=" + ")))
+    
+    OneYearAggs=data.frame(aggregate(data=data_sub, form, FUN=mean))
+    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form1, FUN=median)[,(length(terms)+1)])
+    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form2, FUN=mean)[,(length(terms)+1)])
+    
+  
+    colnames(OneYearAggs)[(length(terms)+2)]=c('med')
+    colnames(OneYearAggs)[(length(terms)+3)]='BNDTotOffset'
+    
+    if(length(grep('ShoreDist', colnames(OneYearAggs)))==0){OneYearAggs$ShoreDist=data_sub$ShoreDist[1]}
+    if(length(grep('Year', colnames(OneYearAggs)))==0){OneYearAggs$Year=data_sub$Year[1]}
+    if(length(grep('JulienDay', colnames(OneYearAggs)))==0){OneYearAggs$JulienDay=data_sub$JulienDay[1]
+    OneYearAggs$DayBin= data_sub$JulienDay[1]}
+    
+    
+  
+    OneYearAggs$JulienDay=OneYearAggs$med
+    OneYearAggs$GroupId=unique(newdat$GroupId)
+      
+    # Report AUC values
+    AUCvals=CalcAUC(tempmod, data_sub = data_sub)
     ModelTable$AUC[ii]=round(AUCvals[1],2)
     ModelTable$Pres[ii]=round(AUCvals[2],2)
-    ModelTable$Abs[ii]=round(AUCvals[3],2)
-  }
+    ModelTable$Abs[ii]=round(AUCvals[3],2)  
+      
+    # Make Predictions
+    if(ii==1){
+    fit=cbind(newdat,  predictvcv(tempmod))
+    dummyfit=cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly))
+    AggData=cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs))
+    
+    }else {
+    fit=rbind(fit, cbind(newdat, predictvcv(tempmod)) )
+    dummyfit=rbind(dummyfit, cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly)))
+    AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs)))
+    }
+    }  
   
-  # Do some house keeping
-  rm(null, mod1, mod2, ModelFull, tempmod, newdat_perdOnly, OneYearAggs, data_sub, AUCvals)
+  rm(null, mod1, mod2, ModelFull, tempmod, newdat_perdOnly, OneYearAggs, data_sub, AUCvals, form, form1, form2)
+  
   
 }
-
-
+ 
 
 # Add dummy dates for plotting (to fix the X axis)
 AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
@@ -830,8 +840,6 @@ dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
 
 
 
-# colorblind palette with black:
-cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 temp=dummyfit[!duplicated(dummyfit$GroupId),]
 
@@ -885,7 +893,9 @@ for(ii in 1:10){
   data_sub$DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01"))
   
   # Extract model (just for clarity)
-  mod=modlist[[ii]]
+  mod=modsig[[ii]]
+  
+  if(!is.character(mod)){
   
   #######################################################
   # Julien Date Smoothes #
@@ -988,8 +998,10 @@ for(ii in 1:10){
     
     AggData=rbind(AggData, OneYearAggs)
   }
+   
+   
   rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
-  
+  }
 }
 
 
