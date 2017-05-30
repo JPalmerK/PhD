@@ -610,20 +610,7 @@ ModelTable$WaldsSigVars='none'
 # OccTable_daily_wDetections$tempoffset=ifelse(OccTable_daily_wDetections$BNDTotOffset>0,
 #                                        .5-OccTable_daily_wDetections$BNDTotOffset,
 #                                        .5)
-# 
-# OccTable_daily_wDetections$tempoffset=(0.5001+(OccTable_daily_wDetections$BNDTotOffset-.5))
-# 
-# NewOcc=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==0,]
-# 
-# NewOcc$tempoffset=.5
-# 
-# NewOcc1=OccTable_daily_wDetections[OccTable_daily_wDetections$OccAll==1,]
-# NewOcc1$tempoffset=1-NewOcc1$BNDTotOffset
-# NewOcc2=NewOcc1
-# NewOcc2$tempoffset=NewOcc2$BNDTotOffset
-# 
-# NewOcc_out=rbind(NewOcc, NewOcc1, NewOcc2)
-# NewOcc_out$tempoffset=inv.logit(NewOcc_out$tempoffset)
+
 
 
 OccTable_daily_wDetections$tempoffset=(ifelse(OccTable_daily_wDetections$OccAll==0,
