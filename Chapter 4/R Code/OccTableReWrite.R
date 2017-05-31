@@ -183,6 +183,7 @@ Trains2015$TrainDateNoTime= as.Date(Trains2015$TrainDateNoTime, "%d/%m/%Y", tz =
 
 
 Trains2014$EncounterID=Trains2014$EncounterID+max(Trains2013$EncounterID)
+Trains2015$EncounterID=Trains2015$EncounterID+max(Trains2014$EncounterID)
 
 Trains=rbind(Trains2013, Trains2014, Trains2015 )
 
