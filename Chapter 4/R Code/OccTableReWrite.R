@@ -179,7 +179,7 @@ Trains2013$UnitLoc=factor(Trains2013$UnitLoc, levels=level_names)
 
 Trains2015$TrainDateNoTime= as.Date(Trains2015$TrainDateNoTime, "%d/%m/%Y", tz = "GMT")
 Trains2014$TrainDateNoTime= as.Date(Trains2014$TrainDateNoTime, "%d/%m/%Y", tz = "GMT")
-Trains2013$TrainDateNoTime= as.Date(Trains2013$TrainDateNoTime, "%d/%m/%Y", tz = "GMT")
+Trains2015$TrainDateNoTime= as.Date(Trains2015$TrainDateNoTime, "%d/%m/%Y", tz = "GMT")
 
 
 Trains2014$EncounterID=Trains2014$EncounterID+max(Trains2013$EncounterID)
