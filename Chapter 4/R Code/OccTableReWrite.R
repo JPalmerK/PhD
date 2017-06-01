@@ -142,9 +142,6 @@ merge.with.order <- function(x,y, ..., sort = T, keep_order)
 # Load Deployment Info and Processed Train Data #
 #########################################################################################################
 
-#Only CPOD info
-DepInfo=read.csv('W:/KJP PHD/Deployment Information/Copy of Marine Scotland 2013-14 CPOD summary data (2).csv')
-
 PdetInfo=read.csv('W:/KJP PHD/4-Bayesian Habitat Use/Pdet at Time/MaxPdet.csv')
 
 
@@ -595,7 +592,7 @@ OccTable=OccTable[!duplicated(OccTable[,1:3]),]
 # Export the CSV #
 ####################################################################################
 
-   write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')   
+   write.csv(OccTable,'W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')   
    
    
    
