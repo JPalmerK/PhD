@@ -4,10 +4,14 @@
 rm(list=ls())
 library(ggplot2)
 library(boot) # for inverse logit
+library(ggjoy) # nice plots
+library(viridis) # kick ass colors
+
 setwd("W:/KJP PHD/3-Detection Function/R Code")
 
 # Read in Occupancy Table
-OccTable= read.csv('OccupancyTable_ThreePdets.csv')
+
+OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 
 # Pull out time with SM coverage
 OccTable_SM=subset(OccTable, SMCoverage==1)
@@ -349,7 +353,6 @@ ggplot(data=Samps_NLAll_sub, aes(UnitLoc, Scaled)) +
 ################################################################################
 
 
-OccTable= read.csv('OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
                "Cro_05", "Cro_10", "Cro_15",
@@ -385,6 +388,17 @@ ggplot(data=newdf, aes(UnitLoc_order, Area, Model)) +
   labs(x='', y=expression(Area~Monitored~" "~(km^{2})))
 
 
+ggplot(data=newdf, aes(Area, UnitLoc_order)) +
+  facet_wrap(~Model, nrow = 1, scale='free_x') +
+  geom_joy(rel_min_height = 0.001, scale = 2) +
+  # geom_joy(aes(fill=UnitLoc),rel_min_height = 0.005, scale = 2) + 
+  # scale_fill_viridis(discrete = T, direction = -1,
+  #                    begin = .1, end = .9) +
+  theme_bw() + 
+  theme(legend.position="none") +
+  ggtitle('Area Monitored Under 3 Threshold Scenarios')+
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(y='', x=expression(Area~Monitored~" "~(km^{2})))
 
 
 
