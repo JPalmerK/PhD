@@ -7,7 +7,7 @@ library(vegan) # for mantel test
 ########################################################################################
 
 
-# Load the Pdet Files
+# Load the Pdet Files 
 Pdet1 =read.csv('W:/KJP PHD/4-Bayesian Habitat Use/Pdet at Time/2013/Lat_05_NLandPdetVals.csv', header = TRUE)
 Pdet1$UnitLoc="Lat_05"
 Pdet2 =read.csv('W:/KJP PHD/4-Bayesian Habitat Use/Pdet at Time/2013/Hel_15_NLandPdetVals.csv', header = TRUE)
