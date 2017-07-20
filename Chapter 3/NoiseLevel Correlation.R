@@ -151,7 +151,10 @@ for (ii in 2:length(unique(Pdetdf$UnitLoc))){
 Pairwise_Correlation=cor(tempdf[1:1095,2:11], use="pairwise.complete.obs")
 summary(Pairwise_Correlation[Pairwise_Correlation<1])
 
-corrgram(Pairwise_Correlation, upper.panel=panel.pie, type = 'corr') 
+corrgram(Pairwise_Correlation, 
+         lower.panel=panel.pie, upper.panel=NULL, 
+         type = 'corr',
+         main="2013 Noise Levels Correlations ") 
 
 # library(GGally)
 # ggpairs(tempdf[1:1095,colnames(tempdf)[2:11]],)
