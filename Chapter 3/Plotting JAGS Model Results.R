@@ -6,6 +6,7 @@ library(ggplot2)
 library(boot) # for inverse logit
 library(ggjoy) # nice plots
 library(viridis) # kick ass colors
+library(grid) #for multiplot
 
 setwd("W:/KJP PHD/3-Detection Function/R Code")
 
@@ -388,7 +389,9 @@ ggplot(data=newdf, aes(UnitLoc_order, Area, Model)) +
   labs(x='', y=expression(Area~Monitored~" "~(km^{2})))
 
 
-ggplot(data=newdf, aes(Area, UnitLoc_order)) +
+# This is ok but not super nice
+
+ggplot(data=newdf, aes(Area, UnitLoc_order, Model)) +
   facet_wrap(~Model, nrow = 1, scale='free_x') +
   geom_joy(rel_min_height = 0.001, scale = 2) +
   # geom_joy(aes(fill=UnitLoc),rel_min_height = 0.005, scale = 2) + 
@@ -397,10 +400,80 @@ ggplot(data=newdf, aes(Area, UnitLoc_order)) +
   theme_bw() + 
   theme(legend.position="none") +
   ggtitle('Area Monitored Under 3 Threshold Scenarios')+
-  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   labs(y='', x=expression(Area~Monitored~" "~(km^{2})))
 
 
+# Make Individual Plots
+
+p1=ggplot(OccTable_SM, aes(x = MedianArea1, y=UnitLoc, fill=UnitLoc)) + 
+  geom_joy(aes(fill=UnitLoc),rel_min_height = 0.005, scale = 3) + 
+  scale_fill_viridis(discrete = T, direction = -1, 
+                     begin = .1, end = .9) +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position="none") +
+  xlim(c(15,41))+
+  labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
+  ylab("") +
+  ggtitle('T1')
+
+
+p2=ggplot(OccTable_SM, aes(x = MedianArea2, y=UnitLoc)) + 
+  geom_joy(aes(fill=UnitLoc),rel_min_height = 0.005, scale = 3) + 
+  scale_fill_viridis(discrete = T, direction = -1, 
+                     begin = .1, end = .9) +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position="none") +
+  xlim(c(25,47))+
+  labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
+  ylab("") +
+  ggtitle('T2')
+
+
+p3=ggplot(OccTable_SM, aes(x = MedianArea3, y=UnitLoc)) + 
+  geom_joy(aes(fill=UnitLoc),rel_min_height = 0.005, scale = 3) + 
+  scale_fill_viridis(discrete = T, direction = -1, 
+                     begin = .1, end = .9) +
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position="none") +
+  xlim(c(12,30))+
+  labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
+  ylab("") +
+  ggtitle('T3')
+
+
+grid.arrange(p1, p2, p3, nrow=1)
+
+# Try tossing everything on one graph
+
+ggplot() + 
+  geom_joy(data = OccTable_SM, aes(x = MedianArea3, y=UnitLoc),
+           rel_min_height = 0.005, scale = 3, fill='blue')  +
+  geom_joy(data = OccTable_SM, aes(x = MedianArea2, y=UnitLoc),
+           rel_min_height = 0.005, scale = 3, fill='red')  +
+  geom_joy(data = OccTable_SM, aes(x = MedianArea1, y=UnitLoc),
+           rel_min_height = 0.005, scale = 3, fill='gray')  +
+  scale_fill_identity(name = 'the fill', guide = 'legend',labels = c('m1, m2, m3')) +
+
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position="none") +
+  xlim(c(12,30))+
+  labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
+  ylab("") +
+  ggtitle('Area')
 
 
 
