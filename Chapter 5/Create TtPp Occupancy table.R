@@ -60,8 +60,8 @@ rm(Trains2013, Trains2014, Trains2015)
 
 
 
-#######################################################################################
-# Load Porposie Clicks # 
+
+# Load Porposie Clicks # #######################################################################################
  # This works! Export Train details for NBHF
  PP2013_trains=read.table("W:/KJP PHD/5-Pp Tt interactions/R Code/2013Por_Train_details.txt", 
                           sep="\t",  row.names=NULL, header=TRUE)
@@ -303,7 +303,7 @@ for(ii in 1:length(unique(Trains$UnitLocYear))){
                                   EncounterSpp='Control',
                                   id=id)
             
-            doldf=data.frame(Dur=DolWait,
+            doldf=data.frame(Dur=DolWait[jj],
                        UnitLoc=substr(Unit, 1,6),
                        Year=PPsub$Year[1],
                        EncounterSpp=Cetsub$EncounterSpp,
@@ -338,8 +338,11 @@ CetaceanWaitingTimes$AllDol= ifelse(CetaceanWaitingTimes$EncounterSpp=='Control'
 CetaceanWaitingTimes=CetaceanWaitingTimes[complete.cases(CetaceanWaitingTimes),]
 CetaceanWaitingTimes=CetaceanWaitingTimes[!is.infinite(CetaceanWaitingTimes$Dur),]
 
-# Make plots for 10 deployment locations #########################################
+# Make plots for 10 deployment locations and histogram to match Tompson et al. #########################################
 
+
+# Calculate the duration in minutes and round
+CetaceanWaitingTimes$Dur_min=round(CetaceanWaitingTimes$Dur*24*60)
 
 
 p_all=list()
@@ -369,8 +372,32 @@ for(ii in 1:10){
   
 }
 
+ggplot(data=CetaceanWaitingTimes, aes(x=Dur_min, group=AllDol, fill=AllDol)) +
+  geom_histogram(position="dodge", bins = 50) + 
+  scale_x_continuous(limits = c(0, 24*60*3)) +
+  theme_bw()
+
+ggplot(data=subset(CetaceanWaitingTimes, EncounterSpp != 'UNK'),
+        aes(x=Dur_min, group=EncounterSpp, fill=EncounterSpp)) +
+  geom_histogram(position="dodge", bins = 50) + 
+  scale_x_continuous(limits = c(0, 24*60*3)) +
+  theme_bw()
+
+ggplot(data=CetaceanWaitingTimes, aes(x=Dur_min, group=AllDol, fill=AllDol)) +
+  geom_density(position="dodge", alpha=.4) + 
+  scale_x_continuous(limits = c(0, 24*60*3)) +
+  theme_bw()
+
+ggplot(data=subset(CetaceanWaitingTimes, EncounterSpp != 'UNK'),
+       aes(x=Dur_min, group=EncounterSpp, fill=EncounterSpp)) +
+  geom_density(position="dodge") + 
+  scale_x_continuous(limits = c(0, 24*60*3)) +
+  theme_bw()
 
 # Build linear models ####################################################################################
+
+
+
 
 
 mod=glm(Dur~EncounterSpp, 
@@ -378,10 +405,15 @@ mod=glm(Dur~EncounterSpp,
          data=CetaceanWaitingTimes)
 
 m1 <- glm.nb(Dur ~ EncounterSpp + ShoreDist + Year, data = CetaceanWaitingTimes)
-m3 <- glm(Dur ~ EncounterSpp + ShoreDist + Year+UnitLoc, family = "quasipoisson", data = CetaceanWaitingTimes)
+m3 <- glm(Dur ~ EncounterSpp + ShoreDist + Year+UnitLoc, family = "poisson", data = CetaceanWaitingTimes)
 
 m3 <- glmer(Dur ~ EncounterSpp+(1|ShoreDist)+(1|GroupId), 
             family =poisson, data = CetaceanWaitingTimes)
+
+
+
+
+
 
 
 data$obs_effect<-1:nrow(data)
@@ -394,7 +426,7 @@ pchisq(2 * (logLik(m1) - logLik(m3)), df = 1, lower.tail = FALSE)
 
 
 
-
+# in progress ###########################################################################
 
 
 
