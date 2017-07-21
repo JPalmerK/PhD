@@ -5,7 +5,7 @@
 # This code reads in the hourly occupancy table for dolphin detections and models
 # daily occupancy using GEEGLM's
 
-# 1)  Load packages, data, and declare local functions      ##############
+# 1)  Load packages and declare local functions      ##############
 
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
@@ -24,44 +24,6 @@ library(MASS)            # for mvrnorm in boostrapping intervals
 library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
-
-OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
-level_names=c( "Lat_05", "Lat_10", "Lat_15",
-               "Hel_05", "Hel_10", "Hel_15",
-               "Cro_05", "Cro_10", "Cro_15",
-               "SpB_05", "SpB_10", "SpB_15",
-               "Fra_05", "Fra_10", "Fra_15",
-               "Cru_05", "Cru_10", "Cru_15",
-               "Sto_05", "Sto_10", "Sto_15",
-               "Abr_05", "Abr_10", "Abr_15",
-               "StA_05", "StA_10", "StA_15",
-               "Stb_05", "Stb_10", "Stb_15")
-
-OccTable$UnitLoc=factor(OccTable$UnitLoc, levels=level_names)
-
-OccTable$UnitLoc=(droplevels(OccTable)$UnitLoc)
-
-
-OccTable$ShoreDist=as.character(OccTable$ShoreDist)
-OccTable$ShoreDist[OccTable$ShoreDist=="5"]='05'
-
-OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
-
-OccTable$Year=as.factor(OccTable$Year)
-meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
-meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
-
-
-
-meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
-meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
-
-meta=merge(meta, meta2, by='UnitLoc', all.x = TRUE)
-colnames(meta)[26]='Slope'
-
-meta_sub=subset(meta, select=c('UnitLoc', 'Slope2'))
-
-OccTable=merge(OccTable, meta_sub, all.x = TRUE)
 
 ### Functions  
 
@@ -307,6 +269,46 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2"
 # (OccAll) was produced by a broadband species. If only frequency banded clicks, P(BND)=0.06 if Broadband
 # clicks P(BND)=0.77 and if unknown clicks P(BND)=0.50
 
+
+OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
+level_names=c( "Lat_05", "Lat_10", "Lat_15",
+               "Hel_05", "Hel_10", "Hel_15",
+               "Cro_05", "Cro_10", "Cro_15",
+               "SpB_05", "SpB_10", "SpB_15",
+               "Fra_05", "Fra_10", "Fra_15",
+               "Cru_05", "Cru_10", "Cru_15",
+               "Sto_05", "Sto_10", "Sto_15",
+               "Abr_05", "Abr_10", "Abr_15",
+               "StA_05", "StA_10", "StA_15",
+               "Stb_05", "Stb_10", "Stb_15")
+
+OccTable$UnitLoc=factor(OccTable$UnitLoc, levels=level_names)
+
+OccTable$UnitLoc=(droplevels(OccTable)$UnitLoc)
+
+
+OccTable$ShoreDist=as.character(OccTable$ShoreDist)
+OccTable$ShoreDist[OccTable$ShoreDist=="5"]='05'
+
+OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
+
+OccTable$Year=as.factor(OccTable$Year)
+meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
+meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
+
+
+
+meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
+meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
+
+meta=merge(meta, meta2, by='UnitLoc', all.x = TRUE)
+colnames(meta)[26]='Slope'
+
+meta_sub=subset(meta, select=c('UnitLoc', 'Slope2'))
+
+OccTable=merge(OccTable, meta_sub, all.x = TRUE)
+
+
 OccTable$GroupId=unlist(strsplit(as.character(OccTable$UnitLoc), split = "_"))[seq(1,(nrow(OccTable)*2)-1,2)]
 
 level_names=c( "Lat", "Hel", "Cro",
@@ -491,7 +493,7 @@ Basic_table$BinConf2014U=binconf(x=Basic_table$NDetections2014, n = Basic_table$
 Basic_table$BinConf2015U=binconf(x=Basic_table$NDetections2015, n = Basic_table$NDays2015)[,3]
 
 
-  
+
 # write.csv(Basic_table, 'W:/KJP PHD/4-Bayesian Habitat Use/Figures/Basic Ocuppancy 2013-2015.csv')
 
 # Table for BND occupancy  #
@@ -527,8 +529,8 @@ Basic_table_bb=Basic_table_bb[, c(1,2,5,8, 3,6,9, 4,7,10)]
 rm(temp1, temp2, temp3, temp4,temp5,temp6, temp7, temp8)
 
 colnames(Basic_table_bb)=c('UnitLoc', 'NDetections2013', 'NDays2013', 'PropOccupied2013'
-                        , 'NDetections2014', 'NDays2014', 'PropOccupied2014'
-                        , 'NDetections2015', 'NDays2015', 'PropOccupied2015')
+                           , 'NDetections2014', 'NDays2014', 'PropOccupied2014'
+                           , 'NDetections2015', 'NDays2015', 'PropOccupied2015')
 
 Basic_table_bb[is.na(Basic_table_bb)]=0
 
@@ -620,257 +622,158 @@ ModelTable$WaldsSigVars='none'
 #                                        .5)
 
 
+# Address weights for deployment locations where data for 2+ survey days?
+
 
 OccTable_daily_wDetections$tempoffset=(ifelse(OccTable_daily_wDetections$OccAll==0,
                                               0,
                                               (1-OccTable_daily_wDetections$BNDTotOffset)))
 
-# list to store the models #
-modlist=list()
 
-# List to store the signficant models
-modsig=list()
+OccTable_daily_wDetections$OccThresh=(ifelse(OccTable_daily_wDetections$BNDTotOffset >= 0.5,
+                                              1,0))
 
 
 
-# Model selection for ten variables
-for(ii in 1:10){
-  
-  
-  data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
-  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
-  data_sub <- droplevels(data_sub)
-  
-  
-  ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
-  ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
-  ModelTable$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
-  
-  newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','BNDTotOffset'))
+mod1=geeglm(BNDTotOffset~GroupId+ShoreDist*bs(JulienDay, knots = mean(JulienDay)), 
+         family = binomial, 
+         data   = OccTable_daily_wDetections,
+         weights = rep(1, nrow(OccTable_daily_wDetections)),
+         id     = UnitLoc,
+         corstr = 'ar1')
 
-  tryCatch({
-    ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
-  
-  tryCatch({
-    ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
-  
-  
-  tryCatch({
-    ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
-  
- 
-  # Determine whether linear model or spline for Julien Day #
+mod2=geeglm(BNDTotOffset~ShoreDist+GroupId*bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
 
-  
-  null=geeglm(OccAll~ShoreDist, 
-              corstr = 'ar1', 
-              offset = tempoffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub) 
-  
-  mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
-              corstr = 'ar1', 
-              offset  = tempoffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub) 
-  
-  mod2=geeglm(OccAll~ShoreDist+JulienDay, 
-              corstr = 'ar1', 
-              offset = tempoffset, 
-              family = binomial, 
-              id     = UnitLoc, 
-              data   = data_sub) 
-  
-  QICvals=QIC(null, mod1, mod2)
-  
-  if (sum(QICvals>10e+15)>2){
-    
-    null=geeglm(OccAll~Year, 
-                corstr = 'ar1', 
-                offset = tempoffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub) 
-    
-    mod1=geeglm(OccAll~Year+bs(JulienDay, knots = mean(JulienDay)), 
-                corstr = 'ar1', 
-                offset = tempoffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    
-    mod2=geeglm(OccAll~Year+JulienDay, 
-                corstr = 'ar1', 
-                offset = tempoffset, 
-                family = binomial, 
-                id     = UnitLoc, 
-                data   = data_sub)
-    
-    QICvals=QIC(null, mod1, mod2)}
-  
-  JdateForm=which.min(QICvals[2:3,1]-QICvals[1,1])
-  if(JdateForm==1){
-    JdateForm='bs(JulienDay, knots = mean(JulienDay))'
-  }else{
-    JdateForm='JulienDay'
-  }
-  
-
-  ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
-                     corstr = 'ar1', 
-                     offset = tempoffset, 
-                     family = binomial, 
-                     id     = UnitLoc, 
-                     data   = data_sub)
+mod3=geeglm(BNDTotOffset~UnitLoc+bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
 
 
-  # Bakcwards selection for QIC
-  modlist[[ii]]=SelectModel(ModelFull)
-  
-  # Document the formula
-  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))
-  
-  # The Data are too sparse to support removal of unsignifcant terms
-  # However, significant terms can be displayed
-  
-  # Walds test function to remove unsignificant terms
-  tempmod=DropVarsWalds(modlist[[ii]])
-  
-  # store the mode
-  modsig[[ii]]=tempmod
-  
-  
-  if(is.character(tempmod)){
-    ModelTable$WaldsSigVars[ii]=tempmod
-    
-    # If covariates were retained then report them, otherwise fill in model table with N values
-    ModelTable$AUC[ii]='NA'
-    ModelTable$Pres[ii]='NA'
-    ModelTable$Abs[ii]='NA'
-  
-  }else{
-    
-    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
-    
-    terms_orig=attr(tempmod$terms,"term.labels")
-    terms_idx= grep('JulienDay', terms_orig)
-    terms=terms_orig
-    
-    # If Julien day present in the model replace it for aggregating
-    if(length(grep('JulienDay', terms_orig))>0){
-      terms[terms_idx]='DayBin'
-    }
-    rm(terms_idx)
-    
-    
-    # Expand terms
-    
-    if(length(grep('JulienDay', terms_orig))>0){jday=seq(min(newdat$JulienDay), max(newdat$JulienDay))
-    }else{
-      jday=median(newdat$JulienDay)}
-    
-    if(length(grep('Year', terms_orig))>0){Year=data_sub$Year[1]}else{
-      Year=unique(data_sub$Year)}
-    
-    if(length(grep('ShoreDist', terms_orig))>0){ShoreDist=data_sub$ShoreDist[1]}else{
-      ShoreDist=unique(data_sub$ShoreDist)}
-      
-      
-    # Make new prediction grid using the terms from the model
-    newdat_perdOnly=expand.grid(JulienDay=jday, Year=Year, ShoreDist=ShoreDist, GroupId=unique(newdat$GroupId),OccAll=0)
-    
-    
-    # Aggregated data for plotting
-    form=as.formula(paste('OccAll ~', paste(terms, collapse=" + ")))
-    form1=as.formula(paste('JulienDay ~', paste(terms, collapse=" + ")))
-    form2=as.formula(paste('BNDTotOffset ~', paste(terms, collapse=" + ")))
-    
-    OneYearAggs=data.frame(aggregate(data=data_sub, form, FUN=mean))
-    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form1, FUN=median)[,(length(terms)+1)])
-    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form2, FUN=mean)[,(length(terms)+1)])
-    
-  
-    colnames(OneYearAggs)[(length(terms)+2)]=c('med')
-    colnames(OneYearAggs)[(length(terms)+3)]='BNDTotOffset'
-    
-    if(length(grep('ShoreDist', colnames(OneYearAggs)))==0){OneYearAggs$ShoreDist=data_sub$ShoreDist[1]}
-    if(length(grep('Year', colnames(OneYearAggs)))==0){OneYearAggs$Year=data_sub$Year[1]}
-    if(length(grep('JulienDay', colnames(OneYearAggs)))==0){OneYearAggs$JulienDay=data_sub$JulienDay[1]
-    OneYearAggs$DayBin= data_sub$JulienDay[1]}
-    
-    
-  
-    OneYearAggs$JulienDay=OneYearAggs$med
-    OneYearAggs$GroupId=unique(newdat$GroupId)
-      
-    # Report AUC values
-    AUCvals=CalcAUC(tempmod, data_sub = data_sub)
-    ModelTable$AUC[ii]=round(AUCvals[1],2)
-    ModelTable$Pres[ii]=round(AUCvals[2],2)
-    ModelTable$Abs[ii]=round(AUCvals[3],2)  
-      
-    # Make Predictions
-    if(ii==1){
-    fit=cbind(newdat,  predictvcv(tempmod))
-    dummyfit=cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly))
-    AggData=cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs))
-    
-    }else {
-    fit=rbind(fit, cbind(newdat, predictvcv(tempmod)) )
-    dummyfit=rbind(dummyfit, cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly)))
-    AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs)))
-    }
-    }  
-  
-  rm(null, mod1, mod2, ModelFull, tempmod, newdat_perdOnly, OneYearAggs, data_sub, AUCvals, form, form1, form2)
-  
-  
-}
- 
+QIC(mod1, mod2, mod3)
 
-# Add dummy dates for plotting (to fix the X axis)
-AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
-AggData$UnitLoc=paste(AggData$GroupId, AggData$ShoreDist, sep="_")
-AggData$BBEst=AggData$BNDTotOffset*AggData$OccAll
+# Version 2- select only BB days 
+mod4=geeglm(BBOcc~GroupId+ShoreDist*bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
 
-fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
-dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
+mod5=geeglm(BBOcc~ShoreDist+GroupId*bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
+
+mod6=geeglm(BBOcc~UnitLoc+bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
+            
+QIC(mod4, mod5, mod6)
+
+# Version 3- select days where probability is greater than .4
+
+mod7=geeglm(OccThresh~GroupId+ShoreDist*bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
+
+mod8=geeglm(OccThresh~ShoreDist+GroupId*bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
+
+mod9=geeglm(OccThresh~UnitLoc+bs(JulienDay, knots = mean(JulienDay)), 
+            family = binomial, 
+            data   = OccTable_daily_wDetections,
+            weights = rep(1, nrow(OccTable_daily_wDetections)),
+            id     = UnitLoc,
+            corstr = 'ar1')
+
+QIC(mod7, mod8, mod9)
+
+
+# 3) Partial Plots for the top three GEEGLM's ######################################################
 
 
 
+# Third model retained in each group
 
-temp=dummyfit[!duplicated(dummyfit$GroupId),]
+mod1=mod3
+mod2=mod6
+mod3=mod9
 
-# Plot all the data
-ggplot(data=dummyfit) +
+# Plot model 1
+ncol_df= ncol(OccTable_daily_wDetections)
+OccTable_daily_wDetections[,ncol_df:(ncol_df+3)]=predictvcv(mod1, newdata = OccTable_daily_wDetections)
+
+ggplot(data=OccTable_daily_wDetections) +
   theme_bw() +
   facet_wrap(~GroupId) +
   scale_colour_manual(values=cbbPalette) +
-  geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
-  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
-  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank') +
-  geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
-                          color=ShoreDist), size=.9) +
-  xlab("") +
-  ylab("")
+  geom_point(aes(x=JulienDay, y=BNDTotOffset, color=ShoreDist), size=.0005) +
+  geom_line(aes(JulienDay, inv.logit(fit), colour=ShoreDist), size=1) +
+  geom_ribbon(aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('Daily Classification Rates')
 
-# Re-plot but limit the x axis to points where data were collected
-ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
-                         color=ShoreDist), size=.9) +
+
+
+# Plot model 2
+OccTable_daily_wDetections[,ncol_df:(ncol_df+3)]=predictvcv(mod2, newdata = OccTable_daily_wDetections)
+
+ggplot(data=OccTable_daily_wDetections) +
   theme_bw() +
   facet_wrap(~GroupId) +
-  geom_point() +
   scale_colour_manual(values=cbbPalette) +
-  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
-  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
-              alpha=.2,linetype= 'blank') +
-  geom_line(aes(x=DummyDate, y=inv.logit(fit)), size=.5) +
-  xlab("") +
-  ylab("")
-  
+  geom_point(aes(x=JulienDay, y=BBOcc, color=ShoreDist), size=.0005) +
+  geom_line(aes(JulienDay, inv.logit(fit), colour=ShoreDist), size=1) +
+  geom_ribbon(aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('Only BND Days')
+
+
+# Plot model 3
+OccTable_daily_wDetections[,ncol_df:(ncol_df+3)]=predictvcv(mod3, newdata = OccTable_daily_wDetections)
+
+ggplot(data=OccTable_daily_wDetections) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(aes(x=JulienDay, y=OccThresh, color=ShoreDist), size=.0005) +
+  geom_line(aes(JulienDay, inv.logit(fit), colour=ShoreDist), size=1) +
+  geom_ribbon(aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('BND days with prob>.4')
+
+
+# Partial plots for factors
+yeardat=partialdf_factor(mod1, OccTable_daily_wDetections, 'Year')
+shoredat=partialdf_factor(mod1, OccTable_daily_wDetections, 'UnitLoc')
+
+ggplot(yeardat, aes(x=Year, y=vals)) +
+  geom_boxplot() +
+  theme_minimal()+
+  ggtitle(paste('Partial Plot of Years', as.character(unique(OccTable_daily_wDetections$GroupId))))
+
+
+ggplot(shoredat, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
 
 
 # 7)  Make Partial plots for QIC selected Models ##################################################################
@@ -1060,6 +963,278 @@ ggplot(data=fitdf_Year_out) +
                    labels=c("2013", "2014", "2015")) +
   ylab("Occupancy Probability") +
   xlab("")
+
+
+
+# Ass ton of model selection code that Luke Nixed ##################
+
+
+
+
+
+# list to store the models #
+modlist=list()
+
+# List to store the signficant models
+modsig=list()
+
+
+
+# Model selection for ten variables
+for(ii in 1:10){
+  
+  
+  data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+  data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+  data_sub <- droplevels(data_sub)
+  
+  
+  ModelTable$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
+  ModelTable$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
+  ModelTable$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+  
+  newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','BNDTotOffset'))
+  
+  tryCatch({
+    ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
+  
+  tryCatch({
+    ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
+  
+  
+  tryCatch({
+    ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
+  
+  
+  # Determine whether linear model or spline for Julien Day #
+  
+  
+  
+  
+  mod1=geeglm(BNDTotOffset~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
+              corstr = 'ar1', 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub,
+              weights = rep(1, nrow(data_sub))) 
+  
+  
+  
+  
+  
+  
+  null=geeglm(OccAll~ShoreDist, 
+              corstr = 'ar1', 
+              offset = tempoffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  mod1=geeglm(OccAll~ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
+              corstr = 'ar1', 
+              offset  = tempoffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  mod2=geeglm(OccAll~ShoreDist+JulienDay, 
+              corstr = 'ar1', 
+              offset = tempoffset, 
+              family = binomial, 
+              id     = UnitLoc, 
+              data   = data_sub) 
+  
+  QICvals=QIC(null, mod1, mod2)
+  
+  if (sum(QICvals>10e+15)>2){
+    
+    null=geeglm(OccAll~Year, 
+                corstr = 'ar1', 
+                offset = tempoffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub) 
+    
+    mod1=geeglm(OccAll~Year+bs(JulienDay, knots = mean(JulienDay)), 
+                corstr = 'ar1', 
+                offset = tempoffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)
+    
+    mod2=geeglm(OccAll~Year+JulienDay, 
+                corstr = 'ar1', 
+                offset = tempoffset, 
+                family = binomial, 
+                id     = UnitLoc, 
+                data   = data_sub)
+    
+    QICvals=QIC(null, mod1, mod2)}
+  
+  JdateForm=which.min(QICvals[2:3,1]-QICvals[1,1])
+  if(JdateForm==1){
+    JdateForm='bs(JulienDay, knots = mean(JulienDay))'
+  }else{
+    JdateForm='JulienDay'
+  }
+  
+  
+  ModelFull=geeglm(as.formula(paste('OccAll~', JdateForm, '+ ShoreDist + Year')), 
+                   corstr = 'ar1', 
+                   offset = tempoffset, 
+                   family = binomial, 
+                   id     = UnitLoc, 
+                   data   = data_sub)
+  
+  
+  # Bakcwards selection for QIC
+  modlist[[ii]]=SelectModel(ModelFull)
+  
+  # Document the formula
+  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(modlist[[ii]])))
+  
+  # The Data are too sparse to support removal of unsignifcant terms
+  # However, significant terms can be displayed
+  
+  # Walds test function to remove unsignificant terms
+  tempmod=DropVarsWalds(modlist[[ii]])
+  
+  # store the mode
+  modsig[[ii]]=tempmod
+  
+  
+  if(is.character(tempmod)){
+    ModelTable$WaldsSigVars[ii]=tempmod
+    
+    # If covariates were retained then report them, otherwise fill in model table with N values
+    ModelTable$AUC[ii]='NA'
+    ModelTable$Pres[ii]='NA'
+    ModelTable$Abs[ii]='NA'
+    
+  }else{
+    
+    ModelTable$WaldsSigVars[ii]=Reduce(paste, deparse(formula(tempmod)))
+    
+    terms_orig=attr(tempmod$terms,"term.labels")
+    terms_idx= grep('JulienDay', terms_orig)
+    terms=terms_orig
+    
+    # If Julien day present in the model replace it for aggregating
+    if(length(grep('JulienDay', terms_orig))>0){
+      terms[terms_idx]='DayBin'
+    }
+    rm(terms_idx)
+    
+    
+    # Expand terms
+    
+    if(length(grep('JulienDay', terms_orig))>0){jday=seq(min(newdat$JulienDay), max(newdat$JulienDay))
+    }else{
+      jday=median(newdat$JulienDay)}
+    
+    if(length(grep('Year', terms_orig))>0){Year=data_sub$Year[1]}else{
+      Year=unique(data_sub$Year)}
+    
+    if(length(grep('ShoreDist', terms_orig))>0){ShoreDist=data_sub$ShoreDist[1]}else{
+      ShoreDist=unique(data_sub$ShoreDist)}
+    
+    
+    # Make new prediction grid using the terms from the model
+    newdat_perdOnly=expand.grid(JulienDay=jday, Year=Year, ShoreDist=ShoreDist, GroupId=unique(newdat$GroupId),OccAll=0)
+    
+    
+    # Aggregated data for plotting
+    form=as.formula(paste('OccAll ~', paste(terms, collapse=" + ")))
+    form1=as.formula(paste('JulienDay ~', paste(terms, collapse=" + ")))
+    form2=as.formula(paste('BNDTotOffset ~', paste(terms, collapse=" + ")))
+    
+    OneYearAggs=data.frame(aggregate(data=data_sub, form, FUN=mean))
+    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form1, FUN=median)[,(length(terms)+1)])
+    OneYearAggs=cbind(OneYearAggs, aggregate(data=data_sub, form2, FUN=mean)[,(length(terms)+1)])
+    
+    
+    colnames(OneYearAggs)[(length(terms)+2)]=c('med')
+    colnames(OneYearAggs)[(length(terms)+3)]='BNDTotOffset'
+    
+    if(length(grep('ShoreDist', colnames(OneYearAggs)))==0){OneYearAggs$ShoreDist=data_sub$ShoreDist[1]}
+    if(length(grep('Year', colnames(OneYearAggs)))==0){OneYearAggs$Year=data_sub$Year[1]}
+    if(length(grep('JulienDay', colnames(OneYearAggs)))==0){OneYearAggs$JulienDay=data_sub$JulienDay[1]
+    OneYearAggs$DayBin= data_sub$JulienDay[1]}
+    
+    
+    
+    OneYearAggs$JulienDay=OneYearAggs$med
+    OneYearAggs$GroupId=unique(newdat$GroupId)
+    
+    # Report AUC values
+    AUCvals=CalcAUC(tempmod, data_sub = data_sub)
+    ModelTable$AUC[ii]=round(AUCvals[1],2)
+    ModelTable$Pres[ii]=round(AUCvals[2],2)
+    ModelTable$Abs[ii]=round(AUCvals[3],2)  
+    
+    # Make Predictions
+    if(ii==1){
+      fit=cbind(newdat,  predictvcv(tempmod))
+      dummyfit=cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly))
+      AggData=cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs))
+      
+    }else {
+      fit=rbind(fit, cbind(newdat, predictvcv(tempmod)) )
+      dummyfit=rbind(dummyfit, cbind(newdat_perdOnly, predictvcv(tempmod, newdata = newdat_perdOnly)))
+      AggData=rbind(AggData, cbind(OneYearAggs, predictvcv(tempmod, newdata = OneYearAggs)))
+    }
+  }  
+  
+  rm(null, mod1, mod2, ModelFull, tempmod, newdat_perdOnly, OneYearAggs, data_sub, AUCvals, form, form1, form2)
+  
+  
+}
+
+
+# Add dummy dates for plotting (to fix the X axis)
+AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
+AggData$UnitLoc=paste(AggData$GroupId, AggData$ShoreDist, sep="_")
+AggData$BBEst=AggData$BNDTotOffset*AggData$OccAll
+
+fit$DummyDate=as.Date(fit$JulienDay, origin=as.Date("2013-01-01"))
+dummyfit$DummyDate=as.Date(dummyfit$JulienDay, origin=as.Date("2013-01-01"))
+
+
+
+
+temp=dummyfit[!duplicated(dummyfit$GroupId),]
+
+# Plot all the data
+ggplot(data=dummyfit) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_line(aes(DummyDate, inv.logit(fit), colour=ShoreDist), size=1) +
+  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
+  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.2,linetype= 'blank') +
+  geom_point(data=AggData, aes(x=DummyDate, y=(BBEst),
+                               color=ShoreDist), size=.9) +
+  xlab("") +
+  ylab("")
+
+# Re-plot but limit the x axis to points where data were collected
+ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
+                         color=ShoreDist), size=.9) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  geom_point() +
+  scale_colour_manual(values=cbbPalette) +
+  annotate("text", x=as.Date("2013-08-15"), y=1, label= as.character(temp$Year)) +
+  geom_ribbon(aes(x=DummyDate, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.2,linetype= 'blank') +
+  geom_line(aes(x=DummyDate, y=inv.logit(fit)), size=.5) +
+  xlab("") +
+  ylab("")
+
+
+
+
 
 
 

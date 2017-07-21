@@ -117,12 +117,6 @@ NL=pdetdf2015$MedianNoiseLevel
 pdetdf2015$MedianNoiseLevel=NL-10*log10(9287.75)+10*log10(100000)-12
 
 
-#####################################################################################
-
-# WTF is going on with NL grid plot
-ggplot(OccTable_SM, aes(x=MedianNoiseLevel, fill=UnitLoc)) +
-  geom_density(alpha=0.25)+
-  scale_x_continuous(limits = c(90, 95)) 
 
 #####################################################################################
 
@@ -145,10 +139,25 @@ for (ii in 2:length(unique(Pdetdf$UnitLoc))){
   rm(list=c('x1'))  
 }
 
+# Create a new df that accounts for trends using first differences
+# y'(t) = y(t) – y(t-1)
+
+df.notrend=tempdf[,1:2]
+df.notrend$Lat_05=c(0, df.notrend$Lat_05[2:nrow(df.notrend)]-
+                       df.notrend$Lat_05[1:nrow(df.notrend)-1])
+
+for (ii in 2:10){
+
+    df.notrend=cbind(df.notrend, 
+                     c(0, tempdf[2:nrow(df.notrend),ii+1]-
+                         tempdf[1:nrow(df.notrend)-1,ii+1]))
+    colnames(df.notrend)[ii+1]=colnames(tempdf)[ii+1]
+ 
+}
 
 
 # Correlation matrix
-Pairwise_Correlation=cor(tempdf[1:1095,2:11], use="pairwise.complete.obs")
+Pairwise_Correlation=cor(tempdf[,2:11], use="pairwise.complete.obs")
 summary(Pairwise_Correlation[Pairwise_Correlation<1])
 
 corrgram(Pairwise_Correlation, 

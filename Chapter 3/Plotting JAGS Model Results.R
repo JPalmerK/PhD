@@ -4,9 +4,10 @@
 rm(list=ls())
 library(ggplot2)
 library(boot) # for inverse logit
-library(ggjoy) # nice plots
-library(viridis) # kick ass colors
-library(grid) #for multiplot
+library(ggjoy) # density plots
+library(grid) # arranging plots
+library(viridis) # sexy colors
+library(rethinking) #HDPI 
 
 setwd("W:/KJP PHD/3-Detection Function/R Code")
 
@@ -34,9 +35,9 @@ M1.SMonly=read.csv("Results_M1_SMonly_samps.csv" )
 
 
 # TL and NL values area monitored defined by M1 constraints
-M2.SMonly=read.csv("Results_M2_SMonly_samps.csv")
-M3.SMonly=read.csv("Results_M3_SMonly_samps.csv")
-M4.SMonly=read.csv("Results_M4_SMonly_samps.csv")
+M2.SMonly=read.csv("Results_M2_SMonly_samps_b.csv")
+M3.SMonly=read.csv("Results_M3_SMonly_samps_b.csv")
+M4.SMonly=read.csv("Results_M4_SMonly_samps_b.csv")
 
 # TL values area monitored defined by M1 constraints
 M2.TLonly=read.csv("Results_M5_TLonly_samps.csv")
@@ -139,12 +140,54 @@ M4.output<-Ordered_Occ(M4.SMonly)
 ################################################################################
 # Facet grid plot #
 ################################################################################
-SM_samps=rbind(M4.output,M3.output,M2.output,M1.output)
+M1.output$Model='Null'
+M2.output$Model='T1'
+M3.output$Model='T2'
+M4.output$Model='T3'
+
+SM_samps=rbind(M1.output,M2.output,M3.output, M4.output)
 SM_samps$UnitLoc_order = factor(SM_samps$UnitLoc, levels=rev(levels(SM_samps$UnitLoc)))
+SM_samps$Model=factor(SM_samps$Model, levels=c('Null', 'T1', 'T2', 'T3'))
+
 SM_samps$isMod1=as.factor((SM_samps$Model=='M1')*1)
 
 
-# mm=SM_samps[! SM_samps$UnitLoc %in% c('Hel_15', 'SpB_10', 'Abr_10', 'StA_10'), ]
+# Get Bayesian Credability intervals
+mm=data.frame(aggregate(data=SM_samps, alpha~UnitLoc+Model, FUN = median))
+mm=cbind(mm, as.numeric(aggregate(data=SM_samps, 
+                                  alpha~UnitLoc+Model,
+                                  FUN = function(x){HPDI(x, 0.90)})[[3]])[1:40])
+mm=cbind(mm, as.numeric(aggregate(data=SM_samps, 
+                                  alpha~UnitLoc+Model,
+                                  FUN = function(x){HPDI(x, 0.90)})[[3]])[41:80])
+
+colnames(mm)<-c('UnitLoc','Model','Median', 'LCI', 'UCI' )
+
+# make overlapping matrix for each model
+OverlapList=list()
+
+for(ii in 1:4){
+  datasub=subset(mm, Model==unique(mm$Model)[ii])
+  
+  OverlapMat=matrix(data = 0, nrow=10, ncol=10)
+  for(jj in 1:10){
+    
+    OverlapMat[jj,
+    which(datasub$Median[jj]>datasub$LCI & datasub$Median[jj]<datasub$UCI)]=1
+    
+  }
+  
+  OverlapList[[ii]]=OverlapMat
+  
+  
+  
+}
+
+
+
+
+
+
 
 # True Occupancy 
  ggplot(data=SM_samps, aes(Model, P.occ)) +
@@ -171,6 +214,7 @@ SM_samps$isMod1=as.factor((SM_samps$Model=='M1')*1)
      labs(y='Relative Occupancy', x='') 
 
 
+
    ggplot(data=SM_samps, aes(UnitLoc, P.occ)) +
      facet_wrap(~Model, nrow = 1, scale='free_x') +
      guides(fill=FALSE)+
@@ -180,8 +224,8 @@ SM_samps$isMod1=as.factor((SM_samps$Model=='M1')*1)
      coord_flip() +
      theme_bw() +
      theme(plot.title = element_text(hjust = 0.5)) +
-     ggtitle('Run 1- C-POD Detections and Noise Levels')+
-     labs(x='', y='Posterior Occupancy Rate Distribution')  
+     ggtitle('Posterior Occupancy Rates')+
+     labs(x='', y='Occupancy Rate ')  
    
      
     
@@ -353,7 +397,6 @@ ggplot(data=Samps_NLAll_sub, aes(UnitLoc, Scaled)) +
 # Plot the Area Monitored #
 ################################################################################
 
-
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
                "Cro_05", "Cro_10", "Cro_15",
@@ -419,7 +462,7 @@ p1=ggplot(OccTable_SM, aes(x = MedianArea1, y=UnitLoc, fill=UnitLoc)) +
   xlim(c(15,41))+
   labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
   ylab("") +
-  ggtitle('T1')
+  ggtitle('M1')
 
 
 p2=ggplot(OccTable_SM, aes(x = MedianArea2, y=UnitLoc)) + 
@@ -434,7 +477,7 @@ p2=ggplot(OccTable_SM, aes(x = MedianArea2, y=UnitLoc)) +
   xlim(c(25,47))+
   labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
   ylab("") +
-  ggtitle('T2')
+  ggtitle('M2')
 
 
 p3=ggplot(OccTable_SM, aes(x = MedianArea3, y=UnitLoc)) + 
@@ -449,31 +492,11 @@ p3=ggplot(OccTable_SM, aes(x = MedianArea3, y=UnitLoc)) +
   xlim(c(12,30))+
   labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
   ylab("") +
-  ggtitle('T3')
+  ggtitle('M3')
 
 
 grid.arrange(p1, p2, p3, nrow=1)
 
-# Try tossing everything on one graph
-
-ggplot() + 
-  geom_joy(data = OccTable_SM, aes(x = MedianArea3, y=UnitLoc),
-           rel_min_height = 0.005, scale = 3, fill='blue')  +
-  geom_joy(data = OccTable_SM, aes(x = MedianArea2, y=UnitLoc),
-           rel_min_height = 0.005, scale = 3, fill='red')  +
-  geom_joy(data = OccTable_SM, aes(x = MedianArea1, y=UnitLoc),
-           rel_min_height = 0.005, scale = 3, fill='gray')  +
-  scale_fill_identity(name = 'the fill', guide = 'legend',labels = c('m1, m2, m3')) +
-
-  theme_bw() + 
-  theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        legend.position="none") +
-  xlim(c(12,30))+
-  labs(y='', x=expression(Area~Monitored~""~(km^{2}))) + 
-  ylab("") +
-  ggtitle('Area')
 
 
 
