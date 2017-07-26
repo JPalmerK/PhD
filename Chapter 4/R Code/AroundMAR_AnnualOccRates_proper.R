@@ -126,40 +126,73 @@ DropVarsWalds=function(ModelFull){
   return(NewModel)
 }
 
-# Function to make GEEGLM
+# Function to catch the warnings, used with make.model to nix
+# crappy models
+withWarnings <-function (expr) { 
+  warnings <- character() 
+  retval <- withCallingHandlers(expr, warning = function(ex) { 
+    warnings <<- c(warnings, conditionMessage(ex)) 
+    invokeRestart("muffleWarning") 
+  }) 
+  list(Value = retval, Warnings = warnings) 
+} 
+
+# Function to do QIC selection for models with interactions only
 Make.model <- function (data_sub) {
+  modformula=list()
+  modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)))
+  modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay)))
+  modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)))
   
-  mod <- try(geeglm(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)), 
-                    family = binomial, 
-                    data   = data_sub,
-                    weights = rep(1, nrow(data_sub)),
-                    id     = UnitLoc,
-                    corstr = 'ar1'), silent = T)
+  QIC_val=c(Inf,Inf,Inf)
   
-  
-  if (class(mod) == "try-error") {
-    cat("Insufficient data for full model knocking out interaction between Julien Day and Shore Distance")
+  for(ii in 1:3){
     
-    out.mod=geeglm(BNDTotOffset~Year+ShoreDist+bs(JulienDay, knots = mean(JulienDay)), 
-                   family = binomial, 
-                   data   = data_sub,
-                   weights = rep(1, nrow(data_sub)),
-                   id     = UnitLoc,
-                   corstr = 'ar1')
+    mod <- try(geeglm(modformula[[ii]], 
+                      family = binomial, 
+                      data   = data_sub,
+                      weights = rep(1, nrow(data_sub)),
+                      id     = UnitLoc,
+                      corstr = 'ar1'), silent = T)
     
-  }else{
-    out.mod=geeglm(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)), 
-                   family = binomial, 
-                   data   = data_sub,
-                   weights = rep(1, nrow(data_sub)),
-                   id     = UnitLoc,
-                   corstr = 'ar1')
-  }
+    
+    if (class(mod) == "try-error") {
+      cat("Insufficient data for full model")
+      
+      
+    }else{
+      
+      mod_warns=withWarnings(geeglm(modformula[[ii]], 
+                                    family = binomial, 
+                                    data   = data_sub,
+                                    weights = rep(1, nrow(data_sub)),
+                                    id     = UnitLoc,
+                                    corstr = 'ar1'))['Warnings']
+      
+      # If there are two or more model warnings then it's likely the fitted probabilities didn't 
+      # converge " fitted probabilities numerically 0 or 1 occurred ", in whcih case nix the model
+      if(length(mod_warns[[1]])<2){ QIC_val[ii]=QIC(mod)}
+      
+      
+      
+    }
+  }  
+  
+  # Get the model with the lowest QIC
+  modformula[[which.min(QIC_val)]]
+  
+  out.mod=geeglm(modformula[[which.min(QIC_val)]], 
+                 family = binomial, 
+                 data   = data_sub,
+                 weights = rep(1, nrow(data_sub)),
+                 id     = UnitLoc,
+                 corstr = 'ar1')
+  warnings()
   return(out.mod)
 }
 
 
-
+# Calculate AUC, %0's id'ed and %1's ided, from Pirotta sperm whale paper 
 CalcAUC<-function(mod, data_sub){
   
   pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
@@ -740,15 +773,14 @@ for(ii in 1:9){
 }
 
 
-# X) Fit models to each deployment gorup #######################################
+# X) Fit models to each deployment gorups, as before #######################################
 
 
   
   # list to store the models #
   modlist=list()
   
-  # List to store the signficant models
-  modsig=list()
+
   
   ModelTable=data.frame(GroupId=unique(OccTable_daily$GroupId))
   ModelTable$Data2013=0
@@ -758,6 +790,8 @@ for(ii in 1:9){
   ModelTable$Nunits2014=0
   ModelTable$Nunits2015=0
   
+  modlist=list()
+  par(ask=F)
   # Build Models for 10 Variables
   for(ii in 1:10){
   
@@ -787,16 +821,53 @@ for(ii in 1:9){
     # Determine whether linear model or spline for Julien Day #
     
     
-    mod1=Make.model(data_sub)
+    modformula=list()
+    modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)))
+    
+    QIC_val=c(Inf,Inf,Inf)
+    print(ii)
+    for(jj in 1:3){
+      mod=try(geeglm(modformula[[jj]], 
+                     family = binomial, 
+                     data   = data_sub,
+                     weights = rep(1, nrow(data_sub)),
+                     id     = UnitLoc,
+                     corstr = 'ar1'), silent = T)
+      
+      
+      
+      if (class(mod) == "try-error"){QIC_val[jj]=Inf} else {
+        temp=withWarnings(geeglm(modformula[[jj]], 
+                                family = binomial, 
+                                data   = data_sub,
+                                weights = rep(1, nrow(data_sub)),
+                                id     = UnitLoc,
+                                corstr = 'ar1'))
+        
+        if(length(temp$Warnings)<2){QIC_val[jj]=QIC(temp$Value)}
+        
+      }
+      print(jj)
+    }
+    
+    finalmodel=geeglm(modformula[[which.min(QIC_val)]], 
+                      family = binomial, 
+                      data   = data_sub,
+                      weights = rep(1, nrow(data_sub)),
+                      id     = UnitLoc,
+                      corstr = 'ar1')
+    
   
     
     
     # Document the formula
-    ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(mod1)))
+    ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(finalmodel)))
     
   
       
-      terms_orig=attr(mod1$terms,"term.labels")
+      terms_orig=attr(finalmodel$terms,"term.labels")
       terms_idx= grep('JulienDay', terms_orig)
       terms=terms_orig
       
@@ -814,9 +885,12 @@ for(ii in 1:9){
         ShoreDist=unique(data_sub$ShoreDist)}
       
       
+      # Keep the final model 
+      modlist[[ii]]=finalmodel
+      
       
       # Report AUC values
-      AUCvals=CalcAUC(mod1, data_sub = data_sub)
+      AUCvals=CalcAUC(finalmodel, data_sub = data_sub)
       ModelTable$AUC[ii]=round(AUCvals[1],2)
       ModelTable$Pres[ii]=round(AUCvals[2],2)
       ModelTable$Abs[ii]=round(AUCvals[3],2)  
@@ -824,10 +898,10 @@ for(ii in 1:9){
 
       # Make Predictions
       if(ii==1){
-        fit=cbind(newdat,  predictvcv(mod1))
+        fit=cbind(newdat,  predictvcv(finalmodel))
         
       }else {
-        fit=rbind(fit, cbind(newdat, predictvcv(mod1)) )
+        fit=rbind(fit, cbind(newdat, predictvcv(finalmodel)) )
             }
     }  
     
@@ -845,7 +919,7 @@ for(ii in 1:9){
     geom_line(data=subset(fit, Year==2013), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2013),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates')
+    ggtitle('Daily Classification Rates 2013' )
     
   
   ggplot(data=subset(OccTable_daily_wDetections, Year==2014)) +
@@ -856,7 +930,7 @@ for(ii in 1:9){
     geom_line(data=subset(fit, Year==2014), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2014),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates')
+    ggtitle('Daily Classification Rates 2014')
   
   
   ggplot(data=subset(OccTable_daily_wDetections, Year==2015)) +
@@ -867,9 +941,217 @@ for(ii in 1:9){
     geom_line(data=subset(fit, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2015),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates')
+    ggtitle('Daily Classification Rates 2015')
     
+  
+  
+  ggplot(data=OccTable_daily_wDetections) +
+    theme_bw() +
+    facet_wrap(~GroupId) +
+    scale_colour_manual(values=cbbPalette) +
+    geom_point(aes(x=JulienDay, y=BNDTotOffset, color=ShoreDist), size=.0005) +
+    geom_line(data=fit, aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+    geom_ribbon(data=fit,aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+                alpha=.3,linetype= 'blank') +
+    ggtitle('Daily Classification Rates 2015')
+  
+  
 
+# Xi) Make partial plots for all groups as before ###########
+  
+  
+  
+  # Plot Storage
+  p=list()
+  Sd_P=list()
+  Yr_P=list()
+  
+  # Make partial plots for all deployment groups
+  for(ii in 1:10){
+    
+    # Again subset the data
+    data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+    data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+    data_sub <- droplevels(data_sub)
+    
+    # Add a dummy date for plotting
+    data_sub$DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01"))
+    
+    # Extract model (just for clarity)
+    mod=modlist[[ii]]
+    
+    if(!is.character(mod)){
+      
+      #######################################################
+      # Julien Date Smoothes #
+      #######################################################
+      
+      if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'JulienDay'))>0){
+        fitdf_jdate=partialDF(mod = mod, data = data_sub, Variable = 'JulienDay')
+        fitdf_jdate$DummyDate=as.Date(fitdf_jdate$JulienDay, origin=as.Date("2013-01-01"))
+        
+      }else{
+        fitdf_jdate=data.frame(JulienDay=data_sub$JulienDay, 
+                               DummyDate=as.Date(data_sub$JulienDay, origin=as.Date("2013-01-01")),
+                               y=NaN,
+                               LCI=NaN,
+                               UCI=NaN)
+      }
+      
+      
+      
+      p[[ii]]=ggplot(data=fitdf_jdate) + 
+        geom_line(aes(x=DummyDate, y=y)) +
+        geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI), alpha=.3) +
+        geom_rug(data=subset(data_sub, OccAll==1), 
+                 aes(x=DummyDate, y=OccAll*.3),
+                 sides='t', alpha=.8) +
+        geom_rug(data=subset(data_sub, OccAll==0), 
+                 aes(x=DummyDate, y=OccAll),
+                 sides='b', alpha=.8) +
+        xlab('Julien Day') +
+        ylab('Detection Probability') +
+        theme_minimal() +
+        ggtitle(paste('Partial Plot of Julien Day', as.character(unique(data_sub$GroupId))))
+      
+      
+      #######################################################
+      # Shore Dist Factors #
+      #######################################################
+      
+      if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'ShoreDist'))>0){
+        
+        fitdf_shoredist=partialdf_factor(mod = mod, data = data_sub, variable = 'ShoreDist')
+        fitdf_shoredist$GroupId=data_sub$GroupId[1]
+        
+        
+      }else{
+        fitdf_shoredist=data.frame(ShoreDist=factor(c('ShoreDist05','ShoreDist10','ShoreDist15')), 
+                                   vals=NaN,
+                                   GroupId=data_sub$GroupId[1])
+      }
+      
+      
+      
+      ggplot(fitdf_shoredist, aes(x=ShoreDist, y=inv.logit(vals)))+geom_violin()
+      
+      #######################################################
+      # Year as Factors #
+      #######################################################
+      
+      if(length(grep(x = as.character( Reduce(paste, deparse(formula(mod))) ), pattern = 'Year'))>0){
+        fitdf_year = partialdf_factor(mod = mod, data = data_sub, variable = 'Year')
+        fitdf_year$GroupId=data_sub$GroupId[1]
+        
+      }else{
+        fitdf_year=data.frame(Year=factor(c('Year2013','Year2014','Year2015')), 
+                              vals=NaN,
+                              GroupId=data_sub$GroupId[1])}
+      ggplot(fitdf_year, aes(x=Year, y=inv.logit(vals)))+geom_violin()
+      
+      
+      
+      
+      
+      
+      Yr_P[[ii]]=ggplot(fitdf_year, aes(x=Year, y=vals)) +
+        geom_boxplot() +
+        theme_minimal()+
+        ggtitle(paste('Partial Plot of Years', as.character(unique(data_sub$GroupId))))
+      #############################
+      # Add all data for plotting #
+      ############################
+      
+      fitdf_jdate$GroupId=data_sub$GroupId[1]
+      
+      OneYearAggs=data.frame(aggregate(data=data_sub, BBOcc~DayBin + GroupId, FUN=mean))
+      OneYearAggs=cbind(OneYearAggs,aggregate(data=data_sub, JulienDay~DayBin+GroupId, FUN=median)[,3])
+      
+      colnames(OneYearAggs)[4]=c('med')
+      
+      if(ii==1){
+        fitdf_jdate_out=fitdf_jdate
+        fitdf_shoredist_out=fitdf_shoredist
+        fitdf_Year_out=fitdf_year
+        
+        AggData=OneYearAggs
+        
+      }else {
+        fitdf_jdate_out=rbind(fitdf_jdate_out, fitdf_jdate)
+        fitdf_shoredist_out=rbind(fitdf_shoredist_out, fitdf_shoredist)
+        fitdf_Year_out=rbind(fitdf_Year_out, fitdf_year)
+        
+        AggData=rbind(AggData, OneYearAggs)
+      }
+      
+      
+      rm(data_sub, mod, JdateForPlotting, x1, test, BootstrapCoefs, Basis, BootstrapFits, BootstrapParameters)
+    }
+  }
+  
+  
+  
+  
+  
+  # Bin the data for visualisation #
+  OccTable_daily_wDetections$DayBin=cut(OccTable_daily_wDetections$JulienDay, breaks=20)
+  
+  
+  AggData=data.frame(aggregate(data=OccTable_daily_wDetections, OccAll~DayBin+GroupId+ShoreDist, FUN=mean))
+  AggData=cbind(AggData, aggregate(data=OccTable_daily_wDetections, JulienDay~DayBin+GroupId+ShoreDist,
+                                   FUN=median)[,4])
+  
+  colnames(AggData)[5]=c('med')
+  
+  AggData$DummyDate=as.Date(AggData$med, origin=as.Date("2013-01-01"))
+  OccTable_daily_wDetections$DummyDate=as.Date(OccTable_daily_wDetections$JulienDay, origin=as.Date("2013-01-01"))
+  
+  
+  ggplot(data=fitdf_jdate_out) +
+    theme_bw() +
+    facet_wrap(~GroupId) +
+    scale_colour_manual(values=cbbPalette) +
+    #geom_point(data=AggData, aes(x=DummyDate, y=OccAll), size=.9) +
+    geom_line(aes(DummyDate, y), size=1) +
+    geom_ribbon(aes(x=DummyDate, ymin=LCI, ymax=UCI),
+                alpha=.2,linetype= 'blank') +
+    geom_rug(data=subset(OccTable_daily_wDetections, OccAll==1), 
+             aes(x=DummyDate, y=BBOcc*.3),
+             sides='t', alpha=.8) +
+    geom_rug(data=subset(OccTable_daily_wDetections, OccAll==0), 
+             aes(x=DummyDate, y=BBOcc),
+             sides='b', alpha=.8) +
+    xlab("") +
+    ylab("") 
+  
+  
+  
+  ggplot(data=fitdf_shoredist_out) +
+    theme_bw() +
+    facet_wrap(~GroupId) +
+    geom_boxplot(aes(x=ShoreDist, y=inv.logit(vals))) +
+    scale_x_discrete(breaks=unique(fitdf_shoredist_out$ShoreDist),
+                     labels=c("Near", "Mid", "Off")) +
+    ylab("Occupancy Probability") +
+    xlab("")
+  
+  
+  
+  ggplot(data=fitdf_Year_out) +
+    theme_bw() +
+    facet_wrap(~GroupId) +
+    geom_boxplot(aes(x=Year, y=inv.logit(vals)))+
+    scale_x_discrete(breaks=unique(fitdf_Year_out$Year),
+                     labels=c("2013", "2014", "2015")) +
+    ylab("Occupancy Probability") +
+    xlab("")
+  
+  
+  
+  
+  
+  
+  
 # 3) Partial Plots for the top three GEEGLM's ######################################################
 
 
@@ -1413,6 +1695,13 @@ ggplot(data=AggData, aes(x=DummyDate, y=(BBEst),
   geom_line(aes(x=DummyDate, y=inv.logit(fit)), size=.5) +
   xlab("") +
   ylab("")
+
+
+
+
+
+
+
 
 
 
