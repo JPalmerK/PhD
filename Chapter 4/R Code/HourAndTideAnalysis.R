@@ -337,9 +337,9 @@ colnames(mm)[4]='SumHrlyDet'
 
 OccTable=merge(OccTable, mm, all.x=TRUE)
 OccTable_DPD=subset(OccTable, SumHrlyDet>0 )
-OccTable_DPD$BNDTotOffset=(ifelse(OccTable_DPD$OccAll==0,
-                                              0,
-                                              (1-OccTable_DPD$BNDTotOffset)))
+# OccTable_DPD$BNDTotOffset=(ifelse(OccTable_DPD$OccAll==0,
+#                                               0,
+#                                               (1-OccTable_DPD$BNDTotOffset)))
 
 
 # 3) Build the models for non-Cromarty ################################################################
@@ -348,32 +348,36 @@ OccTable_DPD$BNDTotOffset=(ifelse(OccTable_DPD$OccAll==0,
 # one knot positioned at the average value. The autoregressive  correlation  is used and the block is defined on the basis of the "GroupID and the Date"
 # such that within each day the probability of detecting a click depends on whether a click was detected in the previous hour
 
+
+
+
+
 OccTable_DPD_nocro=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
 OccTable_DPD_nocro=droplevels(OccTable_DPD_nocro)
 
 
-empty_Unit=geeglm(OccAll ~ Year+ UnitLoc,
+empty_Unit=geeglm(SpeciesOffset ~ Year+ UnitLoc,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=UnitLoc:Date,
                   offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
 
-empty_Slope=geeglm(OccAll ~ Year+ Slope2,
+empty_Slope=geeglm(SpeciesOffset ~ Year+ Slope2,
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=UnitLoc:Date,
                    offset = BNDTotOffset,
                    data = OccTable_DPD_nocro)
 
-empty_SlopeBS=geeglm(OccAll ~ Year+ bs(Slope2, knots=mean(Slope2)),
+empty_SlopeBS=geeglm(SpeciesOffset ~ Year+ bs(Slope2, knots=mean(Slope2)),
                       corstr = 'ar1',
                       family = binomial, # leave out constrains
                       id=UnitLoc:Date,
                       offset = BNDTotOffset,
                       data = OccTable_DPD_nocro)
 
-empty_GrupIdShoreDist=geeglm(OccAll ~ Year+ GroupId + ShoreDist,
+empty_GrupIdShoreDist=geeglm(SpeciesOffset ~ Year+ GroupId + ShoreDist,
                     corstr = 'ar1',
                     family = binomial, # leave out constrains
                    id=UnitLoc:Date,
@@ -396,14 +400,14 @@ empty= empty_GrupIdShoreDist
 
 ## Test linear or smooth for hour of day 
 
-HoDl=geeglm(OccAll ~Year+ GroupId + ShoreDist + HourAfterPeakSolEle,
+HoDl=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + HourAfterPeakSolEle,
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
             offset = BNDTotOffset,
             data = OccTable_DPD_nocro)
 
-HoDs=geeglm(OccAll ~Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+HoDs=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
@@ -420,35 +424,35 @@ QIC(empty, HoDl, HoDs)
 
 # Determine what form tidal phase should take (linear offset, interaction or smooth)
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
-Tidel=geeglm(OccAll ~Year+ GroupId + ShoreDist+ HourAfterHigh,
+Tidel=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist+ HourAfterHigh,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
              offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-Tides=geeglm(OccAll ~Year+ GroupId + ShoreDist + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+Tides=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
              offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-TideHeithl=geeglm(OccAll ~Year+ GroupId + ShoreDist+ Z+ HourAfterHigh,
+TideHeithl=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist+ Z+ HourAfterHigh,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=Date,
                   offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
 
-TideHeights=geeglm(OccAll ~Year+ GroupId + ShoreDist + bs(Z, knots = mean(Z)),
+TideHeights=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(Z, knots = mean(Z)),
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=Date,
                    offset = BNDTotOffset,
                    data = OccTable_DPD_nocro)
 
-TidesPh=geeglm(OccAll ~Year+ GroupId + ShoreDist + Phase,
+TidesPh=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + Phase,
                corstr = 'ar1',
                family = binomial, # leave out constrains
                id=Date,
@@ -468,7 +472,7 @@ QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 # Tidel       13485.67 # winner
 
 ## 3 Use backwards QIC selection to get the model fit  
-ModelFull=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
+ModelFull=geeglm(SpeciesOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
                    UnitLoc + 
                    Year+
                    HourAfterHigh,
