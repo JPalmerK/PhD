@@ -356,32 +356,32 @@ OccTable_DPD_nocro=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
 OccTable_DPD_nocro=droplevels(OccTable_DPD_nocro)
 
 
-empty_Unit=geeglm(SpeciesOffset ~ Year+ UnitLoc,
+empty_Unit=geeglm(BNDTotOffset ~ Year+ UnitLoc,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=UnitLoc:Date,
-                  offset = BNDTotOffset,
+                  #offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
 
-empty_Slope=geeglm(SpeciesOffset ~ Year+ Slope2,
+empty_Slope=geeglm(BNDTotOffset ~ Year+ Slope2,
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=UnitLoc:Date,
-                   offset = BNDTotOffset,
+                   #offset = BNDTotOffset,
                    data = OccTable_DPD_nocro)
 
-empty_SlopeBS=geeglm(SpeciesOffset ~ Year+ bs(Slope2, knots=mean(Slope2)),
+empty_SlopeBS=geeglm(BNDTotOffset ~ Year+ bs(Slope2, knots=mean(Slope2)),
                       corstr = 'ar1',
                       family = binomial, # leave out constrains
                       id=UnitLoc:Date,
-                      offset = BNDTotOffset,
+                      #offset = BNDTotOffset,
                       data = OccTable_DPD_nocro)
 
-empty_GrupIdShoreDist=geeglm(SpeciesOffset ~ Year+ GroupId + ShoreDist,
+empty_GrupIdShoreDist=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist,
                     corstr = 'ar1',
                     family = binomial, # leave out constrains
                    id=UnitLoc:Date,
-               offset = BNDTotOffset,
+               #offset = BNDTotOffset,
                data = OccTable_DPD_nocro)
 
 
@@ -390,29 +390,30 @@ QIC(empty_Unit, empty_SlopeBS, empty_Slope, empty_GrupIdShoreDist)
 
 # # 
 # QIC
-# empty_Unit            13509.14
-# empty_SlopeBS         13543.49
-# empty_Slope           13538.92
-# empty_GrupIdShoreDist 13504.77 #winner
+# empty_Unit            8030.293
+# empty_SlopeBS         8159.221
+# empty_Slope           8166.644
+# empty_GrupIdShoreDist 8024.853 #winner
 
 
 empty= empty_GrupIdShoreDist
 
 ## Test linear or smooth for hour of day 
 
-HoDl=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + HourAfterPeakSolEle,
+HoDl=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist + HourAfterPeakSolEle,
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
-            offset = BNDTotOffset,
+            #offset = BNDTotOffset,
             data = OccTable_DPD_nocro)
 
-HoDs=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+HoDs=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
-            offset = BNDTotOffset,
+            #offset = BNDTotOffset,
             data = OccTable_DPD_nocro)
+
 
 
 QIC(empty, HoDl, HoDs)
@@ -424,39 +425,39 @@ QIC(empty, HoDl, HoDs)
 
 # Determine what form tidal phase should take (linear offset, interaction or smooth)
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
-Tidel=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist+ HourAfterHigh,
+Tidel=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist+ HourAfterHigh,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
-             offset = BNDTotOffset,
+             #offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-Tides=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+Tides=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
-             offset = BNDTotOffset,
+             #offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-TideHeithl=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist+ Z+ HourAfterHigh,
+TideHeithl=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist+ Z,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=Date,
-                  offset = BNDTotOffset,
+                  #offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
 
-TideHeights=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + bs(Z, knots = mean(Z)),
+TideHeights=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + bs(Z, knots = mean(Z)),
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=Date,
-                   offset = BNDTotOffset,
+                   #offset = BNDTotOffset,
                    data = OccTable_DPD_nocro)
 
-TidesPh=geeglm(SpeciesOffset ~Year+ GroupId + ShoreDist + Phase,
+TidesPh=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + Phase,
                corstr = 'ar1',
                family = binomial, # leave out constrains
                id=Date,
-               offset = BNDTotOffset,
+               #offset = BNDTotOffset,
                data = OccTable_DPD_nocro)
 
 
@@ -472,14 +473,14 @@ QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 # Tidel       13485.67 # winner
 
 ## 3 Use backwards QIC selection to get the model fit  
-ModelFull=geeglm(SpeciesOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
+ModelFull=geeglm(BNDTotOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
                    UnitLoc + 
                    Year+
                    HourAfterHigh,
                  corstr = 'ar1',
                  family = binomial, # leave out constrains
                  id=Date,
-                 offset = BNDTotOffset,
+                 #offset = BNDTotOffset,
                  data = OccTable_DPD_nocro)
 
 
@@ -565,13 +566,13 @@ Cro_data=OccTable_DPD[OccTable_DPD$UnitLoc=='Cro_05',]
 Cro_data=droplevels(Cro_data)
 Cro_data$elevationBin=cut(Cro_data$elevation, breaks = 12, labels = round(seq(min(Cro_data$elevation), max(Cro_data$elevation), length=12)))
 
-aggdata_hour=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterPeakSolEle+Year, FUN=mean))
-aggdata_tide=data.frame(aggregate(data=Cro_data, BBOcc~HourAfterHigh+Year, FUN=mean))
-aggdata_elevation=data.frame(aggregate(data=Cro_data, BBOcc~elevationBin+Year, FUN=mean))
+aggdata_hour=data.frame(aggregate(data=Cro_data, BNDTotOffset~HourAfterPeakSolEle+Year, FUN=mean))
+aggdata_tide=data.frame(aggregate(data=Cro_data, BNDTotOffset~HourAfterHigh+Year, FUN=mean))
+aggdata_elevation=data.frame(aggregate(data=Cro_data, BNDTotOffset~elevationBin+Year, FUN=mean))
 
-ggplot(aggdata_hour, aes(HourAfterPeakSolEle, BBOcc, color=Year))+geom_point()
-ggplot(aggdata_tide, aes(HourAfterHigh, BBOcc, color=Year))+geom_point()
-ggplot(aggdata_elevation, aes(elevationBin, BBOcc, color=Year))+geom_point()
+ggplot(aggdata_hour, aes(HourAfterPeakSolEle, BNDTotOffset, color=Year))+geom_point()
+ggplot(aggdata_tide, aes(HourAfterHigh, BNDTotOffset, color=Year))+geom_point()
+ggplot(aggdata_elevation, aes(elevationBin, BNDTotOffset, color=Year))+geom_point()
 
 
 
@@ -584,25 +585,25 @@ ggplot(aggdata_elevation, aes(elevationBin, BBOcc, color=Year))+geom_point()
 
 
 ## Test linear or smooth for hour of day 
-empty=geeglm(OccAll ~Year,
+empty=geeglm(BNDTotOffset ~Year,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
-             offset = BNDTotOffset,
+             #offset = BNDTotOffset,
              data = Cro_data)
 
-HoDl=geeglm(OccAll ~Year + HourAfterPeakSolEle,
+HoDl=geeglm(BNDTotOffset ~Year + HourAfterPeakSolEle,
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=Date,
-            offset = BNDTotOffset,
+            #offset = BNDTotOffset,
             data = Cro_data)
 
-HoDs=geeglm(OccAll ~Year + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+HoDs=geeglm(BNDTotOffset ~Year + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=Date,
-            offset = BNDTotOffset,
+            #offset = BNDTotOffset,
             data = Cro_data)
 
 
@@ -620,39 +621,39 @@ QIC(empty, HoDl, HoDs)
 # 2) Determine what form tidal phase should take (linear offset, interaction or smooth)
 
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
-Tidel=geeglm(OccAll ~Year+ HourAfterHigh,
+Tidel=geeglm(BNDTotOffset ~Year+ HourAfterHigh,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
-             offset = BNDTotOffset,
+             #offset = BNDTotOffset,
              data = Cro_data)
 
-Tides=geeglm(OccAll ~Year + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+Tides=geeglm(BNDTotOffset ~Year + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
-             offset = BNDTotOffset,
+             #offset = BNDTotOffset,
              data = Cro_data)
 
-TideHeithl=geeglm(OccAll ~Year+ Z ,
+TideHeithl=geeglm(BNDTotOffset ~Year+ Z ,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=Date,
-                  offset = BNDTotOffset,
+                  #offset = BNDTotOffset,
                   data = Cro_data)
 
-TideHeights=geeglm(OccAll ~Year + bs(Z, knots = mean(Z)),
+TideHeights=geeglm(BNDTotOffset ~Year + bs(Z, knots = mean(Z)),
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=Date,
-                   offset = BNDTotOffset,
+                   #offset = BNDTotOffset,
                    data = Cro_data)
 
-TidesPh=geeglm(OccAll ~Year+ Phase,
+TidesPh=geeglm(BNDTotOffset ~Year+ Phase,
                corstr = 'ar1',
                family = binomial, # leave out constrains
                id=Date,
-               offset = BNDTotOffset,
+               #offset = BNDTotOffset,
                data = Cro_data)
 
 
@@ -671,13 +672,13 @@ QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 
 ## 3 Use backwards QIC selection to get the model fit  ##
 
-ModelFull=geeglm(OccAll ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
+ModelFull=geeglm(BNDTotOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
                    Z+
                    Year,
                  corstr = 'ar1',
                  family = binomial, # leave out constrains
                  id=Date,
-                 offset = BNDTotOffset,
+                 #offset = BNDTotOffset,
                  data = Cro_data)
 
 Cro_Model_out=SelectModel(ModelFull)
@@ -689,18 +690,18 @@ CalcAUC(Cro_Model_sig, data_sub =Cro_data )
 # 6) Plot the Cromarty Model ################################################################
 
 # Aggregate the data for plotting
-aggdata_hour=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
+aggdata_hour=data.frame(aggregate(data=Cro_data, BNDTotOffset~HourAfterPeakSolEle, 
                                   FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
 
-aggdata_elevation=data.frame(aggregate(data=Cro_data, SpeciesOffset~HourAfterPeakSolEle, 
+aggdata_elevation=data.frame(aggregate(data=Cro_data, BNDTotOffset~HourAfterPeakSolEle, 
                                        FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
-aggdata_GroupId=data.frame(aggregate(data=Cro_data, SpeciesOffset~GroupId,
+aggdata_GroupId=data.frame(aggregate(data=Cro_data, BNDTotOffset~GroupId,
                                      FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 
 Cro_data$TideCut=cut(x = Cro_data$Z, breaks =  quantile(Cro_data$Z, seq(0,1, by = .1)))
-aggdata_tide=data.frame(aggregate(data=Cro_data, SpeciesOffset~TideCut, 
+aggdata_tide=data.frame(aggregate(data=Cro_data, BNDTotOffset~TideCut, 
                                   FUN=function(x){mean(x)/(length(formula(Cro_Model_sig)))}))
 aggdata_tide$Z=aggregate(data=Cro_data, Z~TideCut, FUN=median)[,2]
 
@@ -718,7 +719,7 @@ ggplot(data=fitdf_ele) +
   geom_line(aes(x=HourAfterPeakSolEle, y=y), size=1) +  
   geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.2,linetype= 'blank') +
   geom_point(data=aggdata_hour,
-             aes(x=HourAfterPeakSolEle, y=SpeciesOffset)) +
+             aes(x=HourAfterPeakSolEle, y=BNDTotOffset)) +
   xlab('Hour Relative to Solar Noon') +
   ylab('Detection Probability')
 
@@ -728,7 +729,7 @@ ggplot(data=fitdf_tide) +
   scale_colour_manual(values=cbbPalette) +
   geom_line(aes(x=Z, (y)), size=1) +  
   geom_ribbon(aes(x=Z, ymin=(LCI), ymax=(UCI)),alpha=.2,linetype= 'blank') +
-  geom_point(data=aggdata_tide, aes(x=Z, y=(SpeciesOffset))) +
+  geom_point(data=aggdata_tide, aes(x=Z, y=(BNDTotOffset))) +
   xlab('Hour Relative High Tide') +
   ylab('Hour')
 # 
