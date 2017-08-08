@@ -432,9 +432,24 @@ HoDs=geeglm(BNDTotOffset ~ Year+ bs(HourAfterPeakSolEle, knots = mean(HourAfterP
             #offset = BNDTotOffset,
             data = OccTable_DPD_nocro)
 
+SolarEles=geeglm(BNDTotOffset ~ Year+ bs(elevation, knots = mean(elevation)),
+            corstr = 'ar1',
+            family = binomial, # leave out constrains
+            id=UnitLoc:Date,
+            #offset = BNDTotOffset,
+            data = OccTable_DPD_nocro)
+
+SolarElel=geeglm(BNDTotOffset ~ Year+ elevation,
+                 corstr = 'ar1',
+                 family = binomial, # leave out constrains
+                 id=UnitLoc:Date,
+                 #offset = BNDTotOffset,
+                 data = OccTable_DPD_nocro)
 
 
-QIC( HoDl, HoDs)
+
+
+QIC( HoDl, HoDs, SolarElel, SolarEles)
 
 # QIC
 # empty 13504.77
@@ -493,8 +508,7 @@ QIC(Null, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 ## 3 Use backwards QIC selection to get the model fit  
 ModelFull=geeglm(BNDTotOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
                    UnitLoc + 
-                   Year+
-                   HourAfterHigh,
+                   Year,
                  corstr = 'ar1',
                  family = binomial, # leave out constrains
                  id=Date,
@@ -624,11 +638,24 @@ HoDs=geeglm(BNDTotOffset ~Year + bs(HourAfterPeakSolEle, knots = mean(HourAfterP
             #offset = BNDTotOffset,
             data = Cro_data)
 
+SolarEles=geeglm(BNDTotOffset ~ Year+ bs(elevation, knots = mean(elevation)),
+                 corstr = 'ar1',
+                 family = binomial, # leave out constrains
+                 id=Date,
+                 #offset = BNDTotOffset,
+                 data = Cro_data)
+
+SolarElel=geeglm(BNDTotOffset ~ Year+ elevation,
+                 corstr = 'ar1',
+                 family = binomial, # leave out constrains
+                 id=Date,
+                 #offset = BNDTotOffset,
+                 data = Cro_data)
 
 
 
 
-QIC(empty, HoDl, HoDs)
+QIC(empty, HoDl, HoDs, SolarElel, SolarEles)
 
 # QIC
 # empty 13504.766
@@ -678,12 +705,12 @@ TidesPh=geeglm(BNDTotOffset ~Year+ Phase,
 QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 
 # QIC
-# empty       13504.766
-# TidesPh      4607.268
-# TideHeights  4612.737
-# TideHeithl   4606.535 # winner (barely)
-# Tides        4607.810
-# Tidel        4607.495
+# empty        3770.003
+# TidesPh      3770.883
+# TideHeights  3775.503
+# TideHeithl   3770.282 
+# Tides        3771.453
+# Tidel        3769.510 # winner (barely)
 
 
 
