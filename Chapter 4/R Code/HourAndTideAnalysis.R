@@ -279,6 +279,18 @@ OccTable$UnitLoc=(droplevels(OccTable)$UnitLoc)
 # OccTable=merge(OccTable, meta_sub, all.x = TRUE)
 # rm(meta_sub)
 
+# Add the new slope values and update
+
+meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
+meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
+
+
+
+meta_sub=subset(meta2, select=c('UnitLoc', 'Slope2'))
+
+OccTable=merge(OccTable, meta_sub, all.x = TRUE)
+rm( meta2, meta_sub)
+
 
 OccTable$IsCroFactor=ifelse(OccTable$UnitLoc=='Cro_05', 'Cro05','Other')
 
