@@ -256,7 +256,7 @@ partialdf_factor=function(mod, data, variable){
 
 # 2) Load and prep the data ################################################################
 
-OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets1.csv')
+OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
                "Cro_05", "Cro_10", "Cro_15",
@@ -272,12 +272,12 @@ OccTable$UnitLoc=factor(OccTable$UnitLoc, levels=level_names)
 
 OccTable$UnitLoc=(droplevels(OccTable)$UnitLoc)
 
-meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
-meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
-
-meta_sub=subset(meta, select=c('UnitLoc', 'Slope'))
-OccTable=merge(OccTable, meta_sub, all.x = TRUE)
-rm(meta_sub)
+# meta=read.csv('W:/KJP PHD/CPOD Processing/2013 to 2016 SM deployments.csv')
+# meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
+# 
+# meta_sub=subset(meta, select=c('UnitLoc', 'Slope'))
+# OccTable=merge(OccTable, meta_sub, all.x = TRUE)
+# rm(meta_sub)
 
 
 OccTable$IsCroFactor=ifelse(OccTable$UnitLoc=='Cro_05', 'Cro05','Other')
@@ -355,8 +355,14 @@ OccTable_DPD=subset(OccTable, SumHrlyDet>0 )
 OccTable_DPD_nocro=OccTable_DPD[OccTable_DPD$UnitLoc!='Cro_05',]
 OccTable_DPD_nocro=droplevels(OccTable_DPD_nocro)
 
+Null=geeglm(BNDTotOffset ~ Year ,
+                  corstr = 'ar1',
+                  family = binomial, # leave out constrains
+                  id=UnitLoc:Date,
+                  #offset = BNDTotOffset,
+                  data = OccTable_DPD_nocro)
 
-empty_Unit=geeglm(BNDTotOffset ~ Year+ UnitLoc,
+empty_Unit=geeglm(BNDTotOffset ~ Year + UnitLoc,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=UnitLoc:Date,
@@ -386,7 +392,7 @@ empty_GrupIdShoreDist=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist,
 
 
 
-QIC(empty_Unit, empty_SlopeBS, empty_Slope, empty_GrupIdShoreDist)
+QIC(Null, empty_Unit, empty_SlopeBS, empty_Slope, empty_GrupIdShoreDist)
 
 # # 
 # QIC
@@ -396,18 +402,18 @@ QIC(empty_Unit, empty_SlopeBS, empty_Slope, empty_GrupIdShoreDist)
 # empty_GrupIdShoreDist 8024.853 #winner
 
 
-empty= empty_GrupIdShoreDist
+New_Null= empty_GrupIdShoreDist
 
 ## Test linear or smooth for hour of day 
 
-HoDl=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist + HourAfterPeakSolEle,
+HoDl=geeglm(BNDTotOffset ~ Year+  HourAfterPeakSolEle,
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
             #offset = BNDTotOffset,
             data = OccTable_DPD_nocro)
 
-HoDs=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
+HoDs=geeglm(BNDTotOffset ~ Year+ bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle)),
             corstr = 'ar1',
             family = binomial, # leave out constrains
             id=UnitLoc:Date,
@@ -416,7 +422,7 @@ HoDs=geeglm(BNDTotOffset ~ Year+ GroupId + ShoreDist + bs(HourAfterPeakSolEle, k
 
 
 
-QIC(empty, HoDl, HoDs)
+QIC( HoDl, HoDs)
 
 # QIC
 # empty 13504.77
@@ -425,35 +431,35 @@ QIC(empty, HoDl, HoDs)
 
 # Determine what form tidal phase should take (linear offset, interaction or smooth)
 # Test linear or smooth for hour of day and with or without an interaction with GroupID
-Tidel=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist+ HourAfterHigh,
+Tidel=geeglm(BNDTotOffset ~Year + HourAfterHigh,
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
              #offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-Tides=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
+Tides=geeglm(BNDTotOffset ~Year + bs(HourAfterHigh, knots = mean(HourAfterHigh)),
              corstr = 'ar1',
              family = binomial, # leave out constrains
              id=Date,
              #offset = BNDTotOffset,
              data = OccTable_DPD_nocro)
 
-TideHeithl=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist+ Z,
+TideHeithl=geeglm(BNDTotOffset ~Year + Z,
                   corstr = 'ar1',
                   family = binomial, # leave out constrains
                   id=Date,
                   #offset = BNDTotOffset,
                   data = OccTable_DPD_nocro)
 
-TideHeights=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + bs(Z, knots = mean(Z)),
+TideHeights=geeglm(BNDTotOffset ~Year+  bs(Z, knots = mean(Z)),
                    corstr = 'ar1',
                    family = binomial, # leave out constrains
                    id=Date,
                    #offset = BNDTotOffset,
                    data = OccTable_DPD_nocro)
 
-TidesPh=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + Phase,
+TidesPh=geeglm(BNDTotOffset ~Year+  Phase,
                corstr = 'ar1',
                family = binomial, # leave out constrains
                id=Date,
@@ -461,16 +467,16 @@ TidesPh=geeglm(BNDTotOffset ~Year+ GroupId + ShoreDist + Phase,
                data = OccTable_DPD_nocro)
 
 
-QIC(empty, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
+QIC(Null, TidesPh, TideHeights, TideHeithl, Tides, Tidel) #TideIntS
 
 
 # QIC
-# empty       13504.77
-# TidesPh     13496.21
-# TideHeights 13526.39
-# TideHeithl  13489.89
-# Tides       13497.42
-# Tidel       13485.67 # winner
+# Null       8185.373
+# TidesPh     8197.
+# TideHeights 8211.708
+# TideHeithl  8193.622
+# Tides       8200.669
+# Tidel       8186.807 # winner
 
 ## 3 Use backwards QIC selection to get the model fit  
 ModelFull=geeglm(BNDTotOffset ~bs(HourAfterPeakSolEle, knots = mean(HourAfterPeakSolEle))+
