@@ -544,151 +544,167 @@ CalcAUC(Model_dropped, data_sub=OccTable_DPD_nocro)
 # 3A) Build the models for no-cro using GAMMs####
 
 OccTable_noCro=OccTable[OccTable$UnitLoc != 'Cro_05',]
-# Spatial Model
+# # Spatial Model
+# # 
+# # Null=gamm(BNDTotOffset ~ UnitLoc, 
+# #          correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #          data=OccTable_DPD_nocro, 
+# #          family=binomial,
+# #          random=list(UnitLoc=~1, Year=~1))
+# # 
+# # SlopeL=gamm(BNDTotOffset ~ Slope2, 
+# #           correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #           data=OccTable_DPD_nocro, 
+# #           family=binomial, 
+# #           random=list(UnitLoc=~1, Year=~1))
+# # 
+# # SlopeS=gamm(BNDTotOffset ~ s(Slope2), 
+# #             correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #            data=OccTable_DPD_nocro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # GroupIdShoreDist=gamm(BNDTotOffset ~GroupId + ShoreDist, 
+# #             correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+# #             data=OccTable_DPD_nocro, 
+# #             family=binomial, 
+# #             random=list(UnitLoc=~1, Year=~1))
+# # 
+# # QAIC(Null, SlopeL, GroupIdShoreDist) # Some benefit from adding slope as a linear offset
+# # 
+# # 
+# # 
+# # 
+# # ### Temporal Model 
+# # 
+# # 
+# # Null=gamm(BNDTotOffset ~ UnitLoc, 
+# #           correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+# #             data=OccTable_DPD_nocro, 
+# #             family=binomial, 
+# #             random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tmod1=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc'), 
+# #            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #            data=OccTable_DPD_nocro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tmod2=gamm(BNDTotOffset ~HourAfterPeakSolEle, 
+# #            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+# #            data=OccTable_DPD_nocro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tmod3=gamm(BNDTotOffset ~ UnitLoc+s(Hr, bs='cc'), 
+# #            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+# #            data=OccTable_DPD_nocro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tmod1_int_Group=gamm(BNDTotOffset ~ UnitLoc+s(HourAfterPeakSolEle, bs='cc', by= GroupId), 
+# #            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #            data=OccTable_DPD_nocro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tmod1_int_shore=gamm(BNDTotOffset ~ UnitLoc+s(HourAfterPeakSolEle, bs='cc', by= ShoreDist), 
+# #                correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+# #                data=OccTable_DPD_nocro, 
+# #                family=binomial, 
+# #                random=list(UnitLoc=~1, Year=~1))
+# # 
+# # 
+# # 
+# # mm=AIC(Null, Tmod1, Tmod2, Tmod3, Tmod1_int_Group, Tmod1_int_shore) # smooth by 6 points
+# # mm=mm[order(mm$AIC),]
+# # 
+# # 
+# # 
+# # 
+# # #### Tide Model 
+# # 
+# # 
+# # 
+# # 
+# # Tides=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc'),
+# #            correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
+# #              data=OccTable_noCro, 
+# #              family=binomial, 
+# #              random=list(UnitLoc=~1, Year=~1))
+# # 
+# # 
+# # TideHeights=gamm(BNDTotOffset ~Slope2 + s(Z),
+# #                  correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
+# #                  data=OccTable_noCro, 
+# #                  family=binomial, 
+# #                  random=list(UnitLoc=~1, Year=~1))
+# # 
+# # TidesPh=gamm(BNDTotOffset ~ Slope2 +  Phase,
+# #              correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
+# #                data=OccTable_noCro, 
+# #                family=binomial, 
+# #                random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tides_int_shore=gamm(BNDTotOffset ~ Slope2 + s(HourAfterHigh,  bs='cc', by = ShoreDist),
+# #            correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
+# #            data=OccTable_noCro, 
+# #            family=binomial, 
+# #            random=list(UnitLoc=~1, Year=~1))
+# # 
+# # Tides_int_Group=gamm(BNDTotOffset ~ Slope2 + s(HourAfterHigh,  bs='cc', by = GroupId),
+# #                correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
+# #                data=OccTable_noCro, 
+# #                family=binomial, 
+# #                random=list(UnitLoc=~1, Year=~1))
+# # 
+# # 
+# # mm=AIC(Null, TidesPh, TideHeights, TideHeithl, Tides, Tidel, Tides_int_shore, Tides_int_Group) #
+# # 
+# # mm=mm[order(mm$AIC),]
+# # Offsets were added as per GAMM documentation for models where by was included
+# rm(modlist)
 # 
-# Null=gamm(BNDTotOffset ~ UnitLoc, 
-#          correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-#          data=OccTable_DPD_nocro, 
-#          family=binomial,
-#          random=list(UnitLoc=~1, Year=~1))
-# 
-# SlopeL=gamm(BNDTotOffset ~ Slope2, 
-#           correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-#           data=OccTable_DPD_nocro, 
-#           family=binomial, 
-#           random=list(UnitLoc=~1, Year=~1))
-# 
-# SlopeS=gamm(BNDTotOffset ~ s(Slope2), 
-#             correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-#            data=OccTable_DPD_nocro, 
-#            family=binomial, 
-#            random=list(UnitLoc=~1, Year=~1))
-# 
-# GroupIdShoreDist=gamm(BNDTotOffset ~GroupId + ShoreDist, 
-#             correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
-#             data=OccTable_DPD_nocro, 
-#             family=binomial, 
-#             random=list(UnitLoc=~1, Year=~1))
-# 
-# QAIC(Null, SlopeL, GroupIdShoreDist) # Some benefit from adding slope as a linear offset
-# 
-# 
-# 
-# 
-# ### Temporal Model 
-# 
-# 
-# Null=gamm(BNDTotOffset ~ UnitLoc, 
-#           correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
-#             data=OccTable_DPD_nocro, 
-#             family=binomial, 
-#             random=list(UnitLoc=~1, Year=~1))
-# 
-# Tmod1=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc'), 
+# FullMod=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc') + 
+# s(HourAfterHigh,  bs='cc'), 
 #            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
 #            data=OccTable_DPD_nocro, 
 #            family=binomial, 
 #            random=list(UnitLoc=~1, Year=~1))
 # 
-# Tmod2=gamm(BNDTotOffset ~HourAfterPeakSolEle, 
-#            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
-#            data=OccTable_DPD_nocro, 
-#            family=binomial, 
-#            random=list(UnitLoc=~1, Year=~1))
 # 
-# Tmod3=gamm(BNDTotOffset ~ UnitLoc+s(Hr, bs='cc'), 
-#            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
-#            data=OccTable_DPD_nocro, 
-#            family=binomial, 
-#            random=list(UnitLoc=~1, Year=~1))
+# FullMod_2=gamm(BNDTotOffset ~ ShoreDist+s(HourAfterPeakSolEle, bs='cc') +
+# s(HourAfterHigh,  bs='cc', by = ShoreDist), 
+#              correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+#              data=OccTable_DPD_nocro, 
+#              family=binomial, 
+#              random=list(UnitLoc=~1, Year=~1))
 # 
-# Tmod1_int_Group=gamm(BNDTotOffset ~ UnitLoc+s(HourAfterPeakSolEle, bs='cc', by= GroupId), 
-#            correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-#            data=OccTable_DPD_nocro, 
-#            family=binomial, 
-#            random=list(UnitLoc=~1, Year=~1))
-# 
-# Tmod1_int_shore=gamm(BNDTotOffset ~ UnitLoc+s(HourAfterPeakSolEle, bs='cc', by= ShoreDist), 
+# FullMod_3=gamm(BNDTotOffset ~ GroupId+ s(HourAfterPeakSolEle, bs='cc', by=GroupId) +
+# s(HourAfterHigh,  bs='cc'), 
 #                correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
 #                data=OccTable_DPD_nocro, 
 #                family=binomial, 
 #                random=list(UnitLoc=~1, Year=~1))
 # 
-# 
-# 
-# mm=AIC(Null, Tmod1, Tmod2, Tmod3, Tmod1_int_Group, Tmod1_int_shore) # smooth by 6 points
-# mm=mm[order(mm$AIC),]
-# 
-# 
-# 
-# 
-# #### Tide Model 
-# 
-# 
-# 
-# 
-# Tides=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc'),
-#            correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
-#              data=OccTable_noCro, 
-#              family=binomial, 
-#              random=list(UnitLoc=~1, Year=~1))
-# 
-# 
-# TideHeights=gamm(BNDTotOffset ~Slope2 + s(Z),
-#                  correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
-#                  data=OccTable_noCro, 
-#                  family=binomial, 
-#                  random=list(UnitLoc=~1, Year=~1))
-# 
-# TidesPh=gamm(BNDTotOffset ~ Slope2 +  Phase,
-#              correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
-#                data=OccTable_noCro, 
+# FullMod_4=gamm(BNDTotOffset ~ ShoreDist+te(HourAfterPeakSolEle, HourAfterHigh, by=ShoreDist, bs='cc'), 
+#                correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
+#                data=OccTable_DPD_nocro, 
 #                family=binomial, 
 #                random=list(UnitLoc=~1, Year=~1))
-# 
-# Tides_int_shore=gamm(BNDTotOffset ~ Slope2 + s(HourAfterHigh,  bs='cc', by = ShoreDist),
-#            correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
-#            data=OccTable_noCro, 
-#            family=binomial, 
-#            random=list(UnitLoc=~1, Year=~1))
-# 
-# Tides_int_Group=gamm(BNDTotOffset ~ Slope2 + s(HourAfterHigh,  bs='cc', by = GroupId),
-#                correlation=corAR1(form = ~HourAfterHigh|DateUnitloc), 
-#                data=OccTable_noCro, 
-#                family=binomial, 
+
+# FullMod_5=gamm(BNDTotOffset ~ te(HourAfterPeakSolEle, HourAfterHigh, bs='cc'),
+#                correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+#                data=OccTable_DPD_nocro,
+#                family=binomial,
 #                random=list(UnitLoc=~1, Year=~1))
-# 
-# 
-# mm=AIC(Null, TidesPh, TideHeights, TideHeithl, Tides, Tidel, Tides_int_shore, Tides_int_Group) #
-# 
-# mm=mm[order(mm$AIC),]
 
-rm(modlist)
-
-FullMod=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc'), 
-           correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-           data=OccTable_DPD_nocro, 
-           family=binomial, 
-           random=list(UnitLoc=~1, Year=~1))
-
-
-FullMod_2=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc', by = ShoreDist), 
-             correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-             data=OccTable_DPD_nocro, 
-             family=binomial, 
-             random=list(UnitLoc=~1, Year=~1))
-
-FullMod_3=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc', by=GroupId) + s(HourAfterHigh,  bs='cc'), 
-               correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-               data=OccTable_DPD_nocro, 
-               family=binomial, 
-               random=list(UnitLoc=~1, Year=~1))
-
-FullMod_4=gamm(BNDTotOffset ~ te(HourAfterPeakSolEle, HourAfterHigh, by=ShoreDist, bs='cc'), 
-               correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc), 
-               data=OccTable_DPD_nocro, 
-               family=binomial, 
-               random=list(UnitLoc=~1, Year=~1))
+# FullMod_6=gamm(BNDTotOffset ~ ShoreDist+ s(HourAfterPeakSolEle, bs='cc', by=ShoreDist) +
+# s(HourAfterHigh, bs='cc'),
+#                correlation=corAR1(form = ~HourAfterPeakSolEle|DateUnitloc),
+#                data=OccTable_DPD_nocro,
+#                family=binomial,
+#                random=list(UnitLoc=~1, Year=~1))
 
 
 modlist=list()
@@ -696,10 +712,18 @@ modlist[[1]]=FullMod
 modlist[[2]]=FullMod_2
 modlist[[3]]=FullMod_3
 modlist[[4]]=FullMod_4
+modlist[[5]]=FullMod_5
+modlist[[6]]=FullMod_6
+
+# Save the Model Files
+saveRDS(modlist, "ModelLists.rds")
+modlist <- readRDS("ModelLists.rds")
+
+ModTable_AIC=data.frame(Formula=lapply(modlist, function(x){Reduce(paste,deparse(formula(x)))}),
+                        AIC=lapply(modlist, AIC))
+
 
 # Table to store model performance #
-
-
 
 ModelTable=data.frame(GroupId=levels(OccTable_DPD_nocro$GroupId))
 ModelTable$ModelFormula='none'
@@ -707,8 +731,6 @@ ModelTable$AIC=0
 ModelTable$AUC=0 # Area under the Curve 
 ModelTable$Pres=0 # Proportion of the presences correctly identified 
 ModelTable$Abs=0 # Proportion of the absences correctly idenified
-
-
 
 
 
@@ -721,7 +743,7 @@ for(ii in 1:10){
   data_sub <- droplevels(data_sub)
   
   
-  mod=ls(pattern = 'Full')[3]
+  mod=ls(pattern = 'Full')[6]
   ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(c(mod))))
   ModelTable$AIC[ii]= AIC(get(eval(mod)))
   
@@ -736,9 +758,9 @@ for(ii in 1:10){
 
 
 ## Raw residuals still show correlation, of course...
-acf(residuals(FullMod_2$gam),main="raw residual ACF")
-## But standardized are now fine...
-acf(residuals(FullMod_2$lme,type="normalized"),main="standardized residual ACF")
+acf(residuals(modlist[[6]]$gam),main="raw residual ACF")
+## But standardized are now fine... all better
+acf(residuals(modlist[[6]]$lme,type="normalized"),main="standardized residual ACF")
 
 
 
@@ -797,6 +819,7 @@ ggplot(data=fitdf_UnitLoc) +
   xlab("") +
   ylab("")
 
+# Using model three because everything else looks overfitted
 
 pred_data=expand.grid(GroupId=unique(OccTable_DPD_nocro$GroupId),
                       ShoreDist=unique(OccTable_DPD_nocro$ShoreDist),
