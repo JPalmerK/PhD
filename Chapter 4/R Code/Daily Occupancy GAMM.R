@@ -412,6 +412,39 @@ mm=unlist(lapply(modlist_daily, AIC))
 saveRDS(modlist_daily, "Daily_gamm.rds")
 modlist=readRDS('C:\\Users\\charlotte\\Documents\\GitHub\\PhD\\Chapter 4\\R Code\\ModelLists.rds')
 
+# Spatial Models ################################################################
+
+
+smod=gamm(BNDTotOffset~ s(JulienDay, by=UnitLoc, k=3),
+         correlation=corAR1(form = ~1|dateunit),
+         family=binomial,
+         data=OccTable_daily,
+         random=list(UnitLoc=~1))
+
+smod1=gamm(BNDTotOffset~ s(JulienDay, by=GroupId, k=3),
+          correlation=corAR1(form = ~1|dateunit),
+          family=binomial,
+          data=OccTable_daily,
+          random=list(UnitLoc=~1))
+
+smod2=gamm(BNDTotOffset~ s(JulienDay, by=ShoreDist, k=3),
+          correlation=corAR1(form = ~1|dateunit),
+          family=binomial,
+          data=OccTable_daily,
+          random=list(UnitLoc=~1))
+
+
+modlist_daily_time=list()
+modlist_daily_time[[1]]=smod
+modlist_daily_time[[2]]=smod1
+modlist_daily_time[[3]]=smod2
+
+
+mm=unlist(lapply(modlist_daily_time, AIC))
+
+saveRDS(modlist_daily_time, "Daily_gamm_time.rds")
+modlist=readRDS('C:\\Users\\charlotte\\Documents\\GitHub\\PhD\\Chapter 4\\R Code\\ModelLists.rds')
+
 
 
 
