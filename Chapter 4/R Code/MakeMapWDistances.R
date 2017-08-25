@@ -15,6 +15,28 @@ library(elevatr)
 
 
 
+# Function to create a circle
+SpatialCircle <- function(sp, r=1, npt=100){
+  #	Function to generate a circle (SpatialPolygon) with a given radius (m)
+  #	sp: SpatialPoint object or matrix of coordinates (in UtM)
+  #	r: radius of circle in metres
+  #	npt: number of points to draw circle
+  if ("Spatial"%in%is(sp)){
+    proj <- proj4string(sp)
+    coord <- coordinates(sp)
+  } else {
+    coord <- sp
+  }
+  x <- coord[,1] + ( r * sin(seq(0,2*pi, length=npt)) )
+  y <- coord[,2] + ( r * cos(seq(0,2*pi, length=npt)) )
+  poly <- Polygons(srl=list(Polygon(cbind(x,y))), ID=paste("radius_",r,sep=""))
+  if ("Spatial"%in%is(sp)){
+    return(SpatialPolygons(Srl=list(poly), proj4string=CRS(proj)))
+  } else {
+    return(poly)
+  }
+}
+
 river_locs=data.frame(Rivername=factor(c("Esk",
                                          "Dee", 
                                          "South Esk", 
@@ -49,10 +71,17 @@ river_locs$lonDeg=as.numeric(substr(river_locs$Lon, 1,3)) -
   as.numeric(substr(river_locs$Lon, 4,5))/60 - 
   as.numeric(substr(river_locs$Lon, 6,7))/60/60
 
+# WGS geographic references
+crs.geo <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")  # geographical, datum WGS84
+proj_UTM <- CRS("+proj=utm +zone=30 ellps=WGS84")
 
 
+# Try higher resolution Scotland Map
+gadm <- readRDS("W:/KJP PHD/4-Bayesian Habitat Use/R Code/GBR_adm1.rds") 
+gadm=spTransform(gadm, crs.geo)
+ScotMap_highRes <- gadm[gadm$NAME_1 == "Scotland", ] #Possibly a ploygone already?
 
-map.corunty <- map("world", c("UK"), plot = FALSE, fill = TRUE, res = 0)
+
 
 level_names=c( "Lat_05", "Lat_10", "Lat_15",
                "Hel_05", "Hel_10", "Hel_15",
@@ -67,41 +96,67 @@ level_names=c( "Lat_05", "Lat_10", "Lat_15",
 
 
 
-# Function to create a circle
-SpatialCircle <- function(sp, r=1, npt=100){
-  #	Function to generate a circle (SpatialPolygon) with a given radius (m)
-  #	sp: SpatialPoint object or matrix of coordinates (in UtM)
-  #	r: radius of circle in metres
-  #	npt: number of points to draw circle
-  if ("Spatial"%in%is(sp)){
-    proj <- proj4string(sp)
-    coord <- coordinates(sp)
-  } else {
-    coord <- sp
-  }
-  x <- coord[,1] + ( r * sin(seq(0,2*pi, length=npt)) )
-  y <- coord[,2] + ( r * cos(seq(0,2*pi, length=npt)) )
-  poly <- Polygons(srl=list(Polygon(cbind(x,y))), ID=paste("radius_",r,sep=""))
-  if ("Spatial"%in%is(sp)){
-    return(SpatialPolygons(Srl=list(poly), proj4string=CRS(proj)))
-  } else {
-    return(poly)
-  }
-}
+
 meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
 meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
 meta2$DistToSalmonRun=0
 meta2$RiverName='blarg'
 
-# 2) Data prep, make map convert shit ##############
+#river_coords=river_locs[, c('lonDeg','LatDeg' )]
+coordinates(river_locs)=c('lonDeg','LatDeg' )
 
+
+proj4string(river_locs) <- crs.geo  # define projection system of our data
+summary(river_locs)
+
+coordinates(meta2)=meta2[,c('Lon','Lat' )]
+proj4string(meta2) <- crs.geo  # define projection system of our data
+
+
+
+
+# Load bathymetry (MarMap)
+getNOAA.bathy(lon1 = min(meta2$Lon)-1, lon2 =  max(meta2$Lon)+.2,
+              lat1 =min(meta2$Lat)-.5, lat2 = max(meta2$Lat)+.5,
+              resolution = 1)->NorthSea
+
+# Plot the bathymetry
+blues <- c("lightsteelblue4", "lightsteelblue3",
+           "lightsteelblue2", "lightsteelblue1")
+
+greys <- c(grey(0.6), grey(0.93), grey(0.99))
+
+plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
+     bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
+                 c(min(NorthSea), 1, "darkblue", "lightblue")))
+
+points(river_locs, pch = 21, col = "black",
+       bg = "yellow", cex = 1.3)
+points(meta2, pch = 21, col = "black",
+       bg = "red", cex = 1.3)
+
+# Create a raster version
+NorthSea_raster=as.raster(NorthSea)
+NorthSea_raster=projectRaster(NorthSea_raster, crs = crs.geo)
+NorSea_spatialGrid=as.SpatialGridDataFrame(bathy = NorthSea)
+
+
+# Calculate slope values
+Slope=terrain(NorthSea_raster, opt = 'Slope', unit = 'Radians', neighbors = 4)
+
+
+# Distance to Shore
+
+meta2$DistToShore=dist2isobath(NorthSea, coordinates(meta2), isobath = 0)$distance
 
 # calculate distance to nearest salmon river
 for(ii in 1:30){
-  temp=rep(0, nrow(river_locs))
+  temp=rep(0, length(river_locs))
   
-  for(jj in 1:nrow(river_locs)){
-    temp[jj]=distm (c(meta2$Lon[ii], meta2$Lat[ii]), c(river_locs$lonDeg[jj], river_locs$LatDeg[jj]), fun = distHaversine)
+  for(jj in 1:length(river_locs)){
+    temp[jj]=distm (coordinates(meta2)[ii,], 
+                    coordinates(river_locs)[jj,], 
+                    fun = distHaversine)
   }
   
   meta2$DistToSalmonRun[ii]=min(temp)
@@ -113,121 +168,70 @@ for(ii in 1:30){
 
 # 3) Create Data Grid (WGS) and calculate distance to rivers #######
 
-river_coords=river_locs[, c('lonDeg','LatDeg' )]
-coordinates(river_coords)=c('lonDeg','LatDeg' )
 
-
-crs.geo <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84")  # geographical, datum WGS84
-proj4string(river_coords) <- crs.geo  # define projection system of our data
-summary(river_coords)
-
-coordinates(meta2)=meta2[,c('Lon','Lat' )]
-proj4string(meta2) <- crs.geo  # define projection system of our data
-
-
-
-
-dat=expand.grid(Lon=seq(min(meta2$Lon)-1,
-                        max(meta2$Lon)+.5, length.out = 500),
-                Lat=seq(min(meta2$Lat)-.5,
-                        max(meta2$Lat)+.5, length.out = 500))
+# Create datapoint grids
+dat=expand.grid(Lon=seq(min(meta2$Lon)-.2,
+                        max(meta2$Lon)+.15, length.out = 500),
+                Lat=seq(min(meta2$Lat-.3),
+                        max(meta2$Lat+.25), length.out = 500))
 
 coordinates(dat)=c( 'Lon','Lat')
 proj4string(dat) <-crs.geo
 
-# Calculated distances between feature locations and grid locations
-River_dists=matrix(nrow = length(dat), ncol=nrow(river_locs))
-for(ii in 1:nrow(river_locs)){River_dists[,ii]=distRhumb(river_coords[ii], dat)}
-River_dists=data.frame(River_dists)
-colnames(River_dists)=river_locs$Rivername
+## Plot checking
+# dev.off()
+plot(NorthSea, n = 0, lwd = 0.5, image=TRUE,
+     bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
+                 c(min(NorthSea), 1, "darkblue", "lightblue")))
+# points(dat, cex=.5, bg='red')
 
-# Calculate teh distance between CPOD Locations and Grid Data
-Cpod_dists=matrix(nrow = length(dat), ncol=nrow(meta2))
-for(ii in 1:nrow(meta2)){ Cpod_dists[,ii]=distRhumb(coordinates(meta2)[ii,], dat)}
-Cpod_dists=data.frame(Cpod_dists)
-colnames(Cpod_dists)=meta2$UnitLoc
+# Get depth
+dat$Depth=get.depth(NorthSea, cbind(dat$Lon, dat$Lat), locator = FALSE)
 
 
-# Filter data points that are within 2km of a C-POD
-Cpod_detRange=which(Cpod_dists<=2000)
+# Filter datapoints where depth is less than 1 meter of water
+dat <- dat[dat@data$Depth.depth < 1,]
+
+# Get distane to nearest shore
+dat$DistToShore=dist2isobath(NorthSea, coordinates(dat), isobath = 0)$distance
+
+# Get slope values
+dat$Slope=raster::extract(Slope, dat)
+meta2$SlopeMap=raster::extract(Slope, meta2)
 
 
-
-# Projection to use for spatial objects
-proj_UTM <- CRS("+proj=utm +zone=30 ellps=WGS84")
-
-
-# Create Spatial Polygons
-# Indeces for points in detection range of CPODs
-inside.circle_idx=numeric()
-
-for (ii in 1:nrow(meta2)){
+# Calculate distance between features and all data
+for(ii in 1:length(unique(meta2$RiverName))){
   
+  rname=as.character(unique(meta2$RiverName)[ii])
   
-  # Radius 1 and 2 of the annulus centred on each MARU. To increase legibility of confirmation plots
-  # increase 0.5m to 50m
-  r=2000 #2km
-  
-  CPOD_loc=meta2[ii,]
-  CPOD_loc_UTM=spTransform(CPOD_loc, proj_UTM)
-  
-  
-  ## Circle
-  circle <- SpatialCircle(CPOD_loc_UTM, r)
-  
-  ## Transform circle to WGS
-  circle_wgs=spTransform(circle, crs.geo)
-  
-  
-  
-  inside.circle <- !is.na(over(dat, as(circle_wgs, "SpatialPolygons")))
-  
-  inside.circle_idx=c(inside.circle_idx,
-                      which(!is.na(over(dat, as(circle_wgs, "SpatialPolygons")))))
-  
+  dat@data[, rname]= 
+    distRhumb(river_locs[river_locs$Rivername==as.character(unique(meta2$RiverName)[ii]),], dat)
 }
 
-
-
-points(dat[inside.circle_idx, ], pch=16, col="red")
-
-
-
-# Extract data points within range of each river system ###
-RiverRanges=data.frame(aggregate(data=meta2, DistToSalmonRun~RiverName, FUN=range))
-RiverRanges=merge(RiverRanges, river_locs, 
-                  all.x=TRUE, by.x=c('RiverName'), by.y='Rivername')
-
-# Convert to spatial 
-
-coordinates(RiverRanges)=c('lonDeg','LatDeg' )
-proj4string(RiverRanges) <- crs.geo  # define projection system of our data
-summary(river_coords)
-
-
-
-# Create Spatial Polygons
-# 
-# # Ploygone for the UK
-# UK_map= map("world", region="UK", fill=TRUE, plot=FALSE)
-# IDs <- sapply(strsplit(UK_map$names, ":"), function(x) x[1])
-# UkPoly <- map2SpatialPolygons(UK_map, IDs=IDs, 
-#                               proj4string=crs.geo)
-
-
-
-# Try higher resolution Scotland Map
-gadm <- readRDS("W:/KJP PHD/4-Bayesian Habitat Use/R Code/GBR_adm1.rds") 
-gadm=spTransform(gadm, crs.geo)
-ScotMap <- gadm[gadm$NAME_1 == "Scotland", ] #Possibly a ploygone already?
-
-
-
-# Indeces for points in detection range of CPODs
-inside.river_idx=numeric()
-
-for (ii in 1:nrow(RiverRanges)){
+# Calculate minimum distances 
+dat$DistToSalmonRun=apply(as.data.frame(dat@data[,5:10]), 1, FUN=min)
+dat$RiverName=apply(as.data.frame(dat@data[,5:10]), 1, 
+                    FUN=function(x){unique(meta2$RiverName)[which.min(x)]})
   
+  
+  # Create River Database for localisation
+  RiverRanges=data.frame(aggregate(data=meta2, DistToSalmonRun~RiverName, FUN=range))
+  RiverRanges=merge(RiverRanges, river_locs, 
+                    all.x=TRUE, by.x=c('RiverName'), by.y='Rivername')
+  
+  # Convert to UTM 
+  coordinates(RiverRanges)=c('lonDeg','LatDeg' )
+  proj4string(RiverRanges) <- crs.geo  # define projection system of our data
+  summary(RiverRanges)
+
+  
+  # Determine datapoints within feature ranges of the monitoring area
+  featureRangeIDX=numeric()
+
+for(ii in 1:length(unique(meta2$RiverName))){
+  
+
   
   ## Create two circles, one for the minimum range one for the max, will interpolate
   r1= RiverRanges$DistToSalmonRun[ii,1]-1000 #2km
@@ -244,100 +248,365 @@ for (ii in 1:nrow(RiverRanges)){
   # convert to wgs
   circle1_wgs=spTransform(circle1, crs.geo)
   circle2_wgs=spTransform(circle2, crs.geo)
-  # 
-  # ## Plot checking
-  # plot(circle2_wgs)
-  # plot(circle1_wgs, add=TRUE)
-  # points(subset(meta2, RiverName==RiverRanges$RiverName[ii]), pch=18)
   
-  # Points must be both within range and outside of the UK
-  inside.river= which(!is.na(over(dat, as(circle2_wgs, "SpatialPolygons"))) &
+  
+  plot(circle2_wgs, add=TRUE)
+  plot(circle1_wgs, add=TRUE)
+  
+  
+  inside.feature= which(!is.na(over(dat, as(circle2_wgs, "SpatialPolygons"))) &
                         is.na(over(dat, as(circle1_wgs, "SpatialPolygons"))))
   
-  # Make sure points are also in the water
-  Swimming=which(!is.na(over(dat[inside.river], as(ScotMap, "SpatialPolygons"))))
+  featureRangeIDX=c(featureRangeIDX, inside.feature)
   
   
-  inside.river_idx=c(inside.river_idx, inside.river[-Swimming])
-  
-  
-  
-  River_dists[inside.river[-Swimming],RiverRanges$RiverName[ii]]=NA
-  
-  # # More plot checking, use 2000 and 5000 for plot checking
-  # points(dat[inside.river[-Swimming]], pch=16, col="red") #good
-  
-  print(ii)
-  
+  # 
+  # # Plot checking
+  # points(dat[inside.river,], pch=16, col="red") #good
+  # points(meta2, pch=16, col="green") #good
+  # points(RiverRanges, pch=16, col="blue") #good
+  # 
+  dat[-inside.feature, RiverRanges$RiverName[ii]]=NA
+
+  rm(circle1_wgs, circle2_wgs, circle1, circle2, r1, r2 )
 }
 
-River_dists=River_dists[, c('Esk', 'Dee', 'Spey', 'Tay Firth', 'Tweed', 'Cromarty Firth')]
-
-plot(ScotMap)
-points(dat[inside.river_idx], pch=16, col="red")
-
-plot(ScotMap)
-points(dat[is.na(River_dists$Dee)], col='blue')
 
 
-# Load and extract Bathyemtry marmap #################################################
 
-swimmingdat=dat[inside.river_idx]
+# Remove Duplicates
+featureRangeIDX=unique(featureRangeIDX)
 
-
-# Load the Bathymetry Grid using marmap
-getNOAA.bathy(lon1 = min(coordinates(dat)[,1]), lon2 = max(coordinates(dat)[,1]),
-              lat1 = min(coordinates(dat)[,2]), lat2 = max(coordinates(dat)[,2]),
-              resolution = 1)->NorthSea
-
-# Create a raster version
-NorthSea_raster=as.raster(NorthSea)
-NorthSea_raster=projectRaster(NorthSea_raster, crs = crs.geo)
-NorSea_spatialGrid=as.SpatialGridDataFrame(bathy = NorthSea)
-
-plot(NorthSea, image = TRUE, lwd = 0.3)
-plot(NorthSea_raster, image = TRUE, lwd = 0.3,
-     xlab = "", ylab = "", axes = FALSE)
-
-# Extract approximate depths
-SurveyDepths=get.depth(NorthSea, coordinates(swimmingdat), locator = FALSE)
-
-# Create slope values
-Slope=terrain(NorthSea_raster, opt = 'Slope', unit = 'Radians', neighbors = 4)
+points(dat[!is.na(dat$`Cromarty Firth`),], pch = 21, col = "Green",
+       bg = "green", cex = 1.3)
 
 
-SurveySlope=raster::extract(Slope, swimmingdat)
-CPOD_slope=raster::extract(Slope, meta2)
-CPOD_Depth=get.depth(NorthSea,  coordinates(meta2), locator = FALSE)
+dat$DistToSalmonRun=rowSums(as.data.frame(dat@data[,5:10]), na.rm = TRUE)
 
-# Make the dataframe
-Slope2=numeric()
-RiverName=character()
-DistToSalmonRun=numeric()
+# Make Spatial Models ######################################################################################
 
-# Extract river dists for plotting
-for(ii in 1:ncol(River_dists)){
+# Clear out some crap 
 
-  tempDist=  River_dists[!is.na(River_dists), ii] # need to check the river names
-  RiverName= c( RiverName, rep(RiverRanges$RiverName[ii], length(tempDist)))
-  DistToSalmonRun=c(DistToSalmonRun, tempDist)
+rm(list=setdiff(ls(), c("dat", 'NorthSea', 'NorthSea_raster',
+                        'proj_UTM', 'crs.geo', 'meta2', 'level_names')))
+
+
+library(boot)            # for inv.logit
+library(mgcv)
+library(ggplot2)
+library(lme4)
+library(dplyr)           # for distinct function 
+library(geepack)         # To make the GEE's
+#install_version("geepack", version = "1.0-7", repos = "http://cran.us.r-project.org") for anova.gee, which is gone- Email Soren 5/24/2017
+library(splines)
+library(RColorBrewer)
+library(MuMIn)           # for QIC
+library(MASS)            # for mvrnorm in boostrapping intervals 
+library(ROCR)            # to build the ROC curve
+library(PresenceAbsence) # to build the confusion matrix
+library(mvtnorm)         # for rmvnorm used in predictions/plotting
+library(geosphere)  
+
+
+# Calculate AUC, %0's id'ed and %1's ided, from Pirotta sperm whale paper- 
+# modified for new model
+CalcAUC<-function(mod, data_sub, BinaryResponse_var){
+  
+  pr_dat=as.data.frame(as.numeric(predict(mod, data_sub, type="response")))
+  pr_dat$labels=data_sub[, BinaryResponse_var]
+  
+  colnames(pr_dat)[1]='predictions'
+  pred_dat=prediction(pr_dat$predictions, pr_dat$labels)
+  perf <- performance(pred_dat, measure="tpr", x.measure="fpr") 
+  plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
+  
+  y<-as.data.frame(perf@y.values)
+  x<-as.data.frame(perf@x.values)
+  fi <- atan(y/x) - pi/4                                             # to calculate the angle between the 45° line and the line joining the origin with the point (x;y) on the ROC curve
+  L <- sqrt(x^2+y^2)                                                 # to calculate the length of the line joining the origin to the point (x;y) on the ROC curve
+  d <- L*sin(fi)        
   
   
+  alpha<-as.data.frame(perf@alpha.values)                            # the alpha values represent the corresponding cut-offs
+  Best_cutoff=alpha[which.max(unlist(d)),] 
+  
+  
+  DATA<-matrix(0,nrow(data_sub),3)                                             # to build a matrix with 3 columns and n rows, where n is the dimension of the data set (here 919 - the number of rows can be checked with dim(dat)) 
+  DATA<-as.data.frame(DATA)
+  names(DATA)<-c("plotID","Observed","Predicted")
+  DATA$plotID<-1:nrow(data_sub)                                                # the first column is filled with an ID value that is unique for each row
+  DATA$Observed<-data_sub$BBOcc                                            # the second column reports the observed response (0s and 1s)
+  DATA$Predicted<-predict(mod,data_sub,type="response")                 # the third column reports the predictions
+  cmx(DATA, threshold = Best_cutoff)   
+  
+  
+  # Area under the Curve 
+  auc <- unlist(performance(pred_dat, measure="auc")@y.values)
+  
+  # Proportion of the presences correctly identified 
+  pres=prop.table(cmx(DATA, threshold = Best_cutoff))[1,1]
+  
+  # Proportion of the absences correctly idenified
+  abs=prop.table(cmx(DATA, threshold = Best_cutoff))[2,2]
+  
+  
+  
+  return(c(auc, pres, abs))
 }
-tempdf=data.frame(x=tempDist, y=RiverName, z=DistToSalmonRun)
-
-tempdf=tempdf[!duplicated(tempdf),]
-
-# Form dataframe
-NewData=data.frame(Slope2=SurveySlope,
-                   depth_m=SurveyDepths,
-                   RiverName=RiverName)
 
 
 
 
-# Check depths agree both values
+# colorblind palette with black for plotting
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+
+
+# 2)  Data Prep #################################################################################
+
+# This section processes the hourly occupancy table to correct level orders (GroupID and UnitLoc)
+# Hourly Bottlenose dolphin offsets are delcared where offset represnts probability that a click detection
+# (OccAll) was produced by a broadband species. If only frequency banded clicks, P(BND)=0.06 if Broadband
+# clicks P(BND)=0.77 and if unknown clicks P(BND)=0.50
+
+
+OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_ThreePdets.csv')
 meta=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
-meta=meta[!duplicated(meta$UnitLoc),]
 
-temp=cbind(meta$Depth_m, CPOD_Depth$depth)
+meta2=merge(meta2, distinct(meta[, c('UnitLoc', 'Depth_m')]), by='UnitLoc',all.x=TRUE)
+
+OccTable$UnitLoc=factor(OccTable$UnitLoc, levels=level_names)
+OccTable$DateUnitloc=as.factor(paste(OccTable$Date, OccTable$UnitLoc))
+
+# Distance from shore factor
+OccTable$ShoreDist=as.character(OccTable$ShoreDist)
+OccTable$ShoreDist[OccTable$ShoreDist=="5"]='05'
+OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
+
+# Group ID factor
+level_names_group=c( "Lat", "Hel", "Cro",
+               "SpB", "Fra", "Cru",
+               "Sto", "Abr", "StA",
+               "Stb")
+OccTable$GroupId=unlist(strsplit(as.character(OccTable$UnitLoc), split = "_"))[seq(1,(nrow(OccTable)*2)-1,2)]
+OccTable$GroupId=factor(OccTable$GroupId, levels=level_names_group)
+
+
+# YEAR
+OccTable$Year=as.factor(OccTable$Year)
+
+# Merge meta2 and Occupancy Table
+OccTable=merge(OccTable, meta2[,c('UnitLoc', 'DistToSalmonRun', 'RiverName', 'DistToShore', 'SlopeMap', 'Depth_m')],
+               by='UnitLoc', all.x = TRUE)
+
+OccTable$RiverName=as.factor(OccTable$RiverName)
+
+
+OccTable$JD_scale=scale(OccTable$JulienDay)
+
+OccTable$FBOcc[is.na(OccTable$FBOcc)]=0
+OccTable$BBOcc[is.na(OccTable$BBOcc)]=0
+OccTable$UNKOcc[is.na(OccTable$UNKOcc)]=0
+
+
+# 2a) Aggregate hourly Detections into Daily Occupancy table ######################################################
+
+# This section of code aggregates the hourly occupancy into daily occupancy and
+# Assigns BND offset scores to each day indicating the probability that on any given day,
+# There was a bottlenose dolphin in the detections
+
+# Offset scores where multiple species present calculated using a weighted average of the hourly 
+# detection scores.(Next iteration migh consider likelihood ratios instead, but enough stuff to deal with at present)
+
+
+# Add total number of detections 
+mm.bbtot=as.data.frame(aggregate(BBOcc~UnitLoc+Date, FUN=sum, data = OccTable))
+colnames(mm.bbtot)[3]='BBTot'
+mm.fbtot=as.data.frame(aggregate(FBOcc~UnitLoc+Date, FUN=sum, data = OccTable))
+colnames(mm.fbtot)[3]='FBTot'
+mm.unktot=as.data.frame(aggregate(UNKOcc~UnitLoc+Date, FUN=sum, data = OccTable))
+colnames(mm.unktot)[3]='UNKTot'
+
+
+mm=distinct(OccTable, Date, UnitLoc, JulienDay, GroupId, ShoreDist, SlopeMap, 
+            Year, Month, RiverName, DistToSalmonRun, Depth_m, DistToShore)
+mm.bb=distinct(subset(OccTable, BBOcc>0), Date, BBOcc, UnitLoc)
+mm.fb=distinct(subset(OccTable, FBOcc>0), Date, FBOcc, UnitLoc)
+mm.unk=distinct(subset(OccTable, UNKOcc>0), Date, UNKOcc, UnitLoc)
+
+
+OccTable_daily=merge(mm, mm.bb, by = c('Date', 'UnitLoc'), all.x = TRUE)
+OccTable_daily=merge(OccTable_daily, mm.fb, by = c('Date', 'UnitLoc'), all.x = TRUE)
+OccTable_daily=merge(OccTable_daily, mm.unk, by = c('Date', 'UnitLoc'), all.x = TRUE)
+
+OccTable_daily=merge(OccTable_daily, mm.bbtot, by = c('Date', 'UnitLoc'), all.x = TRUE)
+OccTable_daily=merge(OccTable_daily, mm.fbtot, by = c('Date', 'UnitLoc'), all.x = TRUE)
+OccTable_daily=merge(OccTable_daily, mm.unktot, by = c('Date', 'UnitLoc'), all.x = TRUE)
+
+
+# Set NA scores to 0
+OccTable_daily[is.na(OccTable_daily)] <- 0
+
+
+OccTable_daily$SpeciesOffset=OccTable_daily$BBOcc+OccTable_daily$FBOcc+OccTable_daily$UNKOcc
+OccTable_daily$OccAll=ifelse(OccTable_daily$SpeciesOffset>=1,1,0)
+
+# Species offset for Daily Occupancy
+# If two species same day and same unit then uncertain
+OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset>1]=0.5
+OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$BBOcc==1]=0.77
+OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$FBOcc==1]=0.06
+OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==1 & OccTable_daily$UNKOcc==1]=0.5
+#OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = .01
+
+
+
+# Total offset
+OccTable_daily$BNDTotOffset=(OccTable_daily$BBTot*.77+OccTable_daily$FBTot*.06+OccTable_daily$UNKTot*.5)/
+  (OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
+OccTable_daily$TotDet=(OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
+OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=0
+OccTable_daily$dateunit=as.factor(paste(OccTable_daily$Date, OccTable_daily$UnitLoc))
+OccTable_daily$ScaleJd=scale(OccTable_daily$JulienDay)
+
+
+# Add season
+OccTable_daily$Season=NA
+OccTable_daily$Season[OccTable_daily$Month < 6]='Spring'
+OccTable_daily$Season[OccTable_daily$Month > 8]='Autum'
+OccTable_daily$Season[which(is.na(OccTable_daily$Season))]='Summer'
+OccTable_daily$Season=as.factor(OccTable_daily$Season)
+
+OccTable_daily$CentredMonth=OccTable_daily$Month-median(median(unique(OccTable_daily$Month)))
+OccTable_daily$yearseason=as.factor(paste(OccTable_daily$Year, OccTable_daily$Season))
+OccTable_daily$SeasonRiver=as.factor(paste(OccTable_daily$Season, OccTable_daily$RiverName))
+
+rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
+
+##### Spatial Models##########################################################################
+
+# Investagate correlation between covariates
+
+cor(meta2$Depth_m, meta2$DistToSalmonRun, method='pearson') # correlation -0.4
+cor(meta2$Depth_m, meta2$SlopeMap, method='pearson') 
+cor(meta2$Depth_m, meta2$DistToShore, method='pearson') 
+
+cor(meta2$DistToSalmonRun, meta2$SlopeMap, method='pearson') 
+cor(meta2$DistToSalmonRun, meta2$DistToShore, method='pearson') 
+
+cor(meta2$SlopeMap, meta2$DistToShore, method='pearson') 
+
+# All highly fucking correlated! 
+
+modlist_spatial=list()
+
+
+modlist_spatial[[1]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+modlist_spatial[[2]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+modlist_spatial[[3]]= gamm(BNDTotOffset~s(DistToShore, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+modlist_spatial[[4]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+
+modlist_spatial[[5]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+
+modlist_spatial[[6]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3)+s(SlopeMap, bs='ts', k=3),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+
+modlist_spatial[[7]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=RiverName),
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+
+modlist_spatial[[8]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3) + Season,
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+modlist_spatial[[9]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3) + 
+                             s(SlopeMap, bs='ts', k=3) + Season,
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+
+modlist_spatial[[10]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
+                            +s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+                           correlation=corAR1(form = ~1|dateunit),
+                           family=binomial,
+                           data=OccTable_daily)
+
+modlist_spatial[[11]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+
+                              s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+                            correlation=corAR1(form = ~1|dateunit),
+                            family=binomial,
+                            data=OccTable_daily)
+
+modlist_spatial[[12]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+                            correlation=corAR1(form = ~1|dateunit),
+                            family=binomial,
+                            data=OccTable_daily)
+
+modlist_spatial[[13]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
+                            +s(DistToShore, bs='ts', k=3, by=Season) + Season,
+                            correlation=corAR1(form = ~1|dateunit),
+                            family=binomial,
+                            data=OccTable_daily)
+
+modlist_spatial[[14]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)
+                            +s(DistToShore, bs='ts', k=3, by=Season) + Season,
+                            correlation=corAR1(form = ~1|dateunit),
+                            family=binomial,
+                            data=OccTable_daily)
+
+
+lapply(modlist_spatial, AIC)
+
+Preddat=data.frame(SlopeMap=dat$Slope, 
+                   Depth_m=dat$Depth.depth,
+                   DistToSalmonRun=dat$DistToSalmonRun,
+                   BNDTotOffset=rep(0, nrow(dat)),
+                   DistToShore=dat$DistToShore,
+                   Season='Summer')
+
+
+
+
+dat1=dat
+preds=predict(modlist_spatial[[13]], Preddat, type='response', se.fit=TRUE)
+preds$UCI=preds$fit+(1.96*preds$se.fit)
+preds$LCI=preds$fit-(1.96*preds$se.fit)
+
+dat1=cbind(dat1, preds)
+
+rbPal <- colorRampPalette(c('red','blue'))
+dat1$Col <- rbPal(10)[as.numeric(cut(dat1$fit,breaks = 10))]
+
+plot(dat1$Depth.lon, dat1$Depth.lat,
+     pch = 20,
+     col = dat1$Col, main=Preddat$Season[1])
+
+
