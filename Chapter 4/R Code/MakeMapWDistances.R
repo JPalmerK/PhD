@@ -171,9 +171,9 @@ for(ii in 1:30){
 
 # Create datapoint grids
 dat=expand.grid(Lon=seq(min(meta2$Lon)-.2,
-                        max(meta2$Lon)+.15, length.out = 500),
+                        max(meta2$Lon)+.15, length.out = 250),
                 Lat=seq(min(meta2$Lat-.3),
-                        max(meta2$Lat+.25), length.out = 500))
+                        max(meta2$Lat+.25), length.out = 250))
 
 coordinates(dat)=c( 'Lon','Lat')
 proj4string(dat) <-crs.geo
@@ -193,8 +193,8 @@ dat$Depth=get.depth(NorthSea, cbind(dat$Lon, dat$Lat), locator = FALSE)
 dat <- dat[dat@data$Depth.depth < 1,]
 
 # Get distane to nearest shore
-dat$DistToShore=dist2isobath(NorthSea, coordinates(dat), isobath = 0)$distance
-
+dat$DistToShore= mm
+  
 # Get slope values
 dat$Slope=raster::extract(Slope, dat)
 meta2$SlopeMap=raster::extract(Slope, meta2)
@@ -576,27 +576,43 @@ modlist_spatial[[13]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Sea
                             family=binomial,
                             data=OccTable_daily)
 
-modlist_spatial[[14]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)
+modlist_spatial[[14]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3)
                             +s(DistToShore, bs='ts', k=3, by=Season) + Season,
                             correlation=corAR1(form = ~1|dateunit),
                             family=binomial,
                             data=OccTable_daily)
 
 
+modlist_spatial[[15]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
+                            + s(DistToShore, bs='ts', k=3) + Season,
+                            correlation=corAR1(form = ~1|dateunit),
+                            family=binomial,
+                            data=OccTable_daily)
+
+modlist_spatial[[16]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
+                            + s(DistToShore, bs='ts', k=3) + Season,
+                            correlation=corAR1(form = ~1|UnitLoc),
+                            family=binomial,
+                            data=OccTable_daily)
+
+
 lapply(modlist_spatial, AIC)
 
-Preddat=data.frame(SlopeMap=dat$Slope, 
-                   Depth_m=dat$Depth.depth,
-                   DistToSalmonRun=dat$DistToSalmonRun,
-                   BNDTotOffset=rep(0, nrow(dat)),
-                   DistToShore=dat$DistToShore,
+
+dat1=dat[dat$DistToShore<(max(meta2$DistToShore)+2000),]
+
+Preddat=data.frame(SlopeMap=dat1$Slope, 
+                   Depth_m=dat1$Depth.depth,
+                   DistToSalmonRun=dat1$DistToSalmonRun,
+                   BNDTotOffset=rep(0, nrow(dat1)),
+                   DistToShore=dat1$DistToShore,
                    Season='Summer')
 
 
 
 
-dat1=dat
-preds=predict(modlist_spatial[[13]], Preddat, type='response', se.fit=TRUE)
+
+preds=predict(modlist_spatial[[16]], Preddat, type='response', se.fit=TRUE)
 preds$UCI=preds$fit+(1.96*preds$se.fit)
 preds$LCI=preds$fit-(1.96*preds$se.fit)
 
