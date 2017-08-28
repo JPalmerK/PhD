@@ -2,7 +2,7 @@
 
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
-rm(list=ls())
+# rm(list=ls())
 library(boot)            # for inv.logit
 library(mgcv)
 library(ggplot2)
@@ -260,6 +260,11 @@ FullModel_NoCro=gamm(BNDTotOffset ~ShoreDist+GroupId+s(HourAfterHigh, bs='cc', k
                family=binomial,
                random=list(UnitLoc=~1))
 
+temp=gamm(BNDTotOffset~s(HourAfterPeakSolEle, bs='cc', k=10, by=IsCro)+IsCro, 
+                     correlation=corAR1(form= ~id3|id4),
+                     data=OccTable_DPD,
+                     family=binomial,
+                     random=list(UnitLoc=~1))
 
 
 
@@ -267,13 +272,15 @@ FullModel_NoCro=gamm(BNDTotOffset ~ShoreDist+GroupId+s(HourAfterHigh, bs='cc', k
 
 
 
-FullModel=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc', k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=IsCro)+IsCro,
+FullModel=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc', k=10)+ 
+                 s(HourAfterPeakSolEle, bs='cc', k=10, by=IsCro)+IsCro,
            correlation=corAR1(form= ~id3|id4),
              data=OccTable_DPD_nocro,
              family=binomial,
              random=list(UnitLoc=~1))
 
-FullModel_1=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=GroupId)+GroupId,
+FullModel_1=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ 
+                   s(HourAfterPeakSolEle, bs='cc', k=10, by=GroupId)+GroupId,
                correlation=corAR1(form=~id3|id4),
                data=OccTable_DPD_nocro,
                family=binomial,
@@ -310,12 +317,11 @@ FullModel_6=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeak
                  random=list(UnitLoc=~1))
 
 
-FullModel_8=gamm(BNDTotOffset ~te(Z,Depth_m, k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=GroupId),+GroupId
+FullModel_11=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=ShoreDist) + Depth_m +DistToSalmonRun,
                  correlation=corAR1(form=~id3|id4),
                  data=OccTable_DPD_nocro,
                  family=binomial,
                  random=list(UnitLoc=~1))
-
 
 FullModel_6=gamm(BNDTotOffset ~scale(Depth_m) + te(HourAfterPeakSolEle, HourAfterHigh, bs='cc', k=10),
                  correlation=corAR1(form=~id3|id4),
@@ -343,13 +349,13 @@ FullModel_10=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPea
 
 
 
-mm=data.frame(AIC(FullModel, FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
-                  FullModel_5, FullModel_6, FullModel_7, FullModel_8, FullModel_9, 
+mm=data.frame(AIC( FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
+                  FullModel_5, FullModel_6, FullModel_7, FullModel_9, 
                   FullModel_10))
 mm=mm[order(mm$AIC),]
 
-modlist=list(FullModel, FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
-              FullModel_5, FullModel_6, FullModel_7, FullModel_8, FullModel_9, 
+modlist=list( FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
+              FullModel_5, FullModel_6, FullModel_7, FullModel_9, 
               FullModel_10)
 
 # Make Model Selection table
