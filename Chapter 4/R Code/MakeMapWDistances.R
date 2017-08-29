@@ -304,6 +304,7 @@ library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
 library(geosphere)  
+library(fields)
 
 
 # Calculate AUC, %0's id'ed and %1's ided, from Pirotta sperm whale paper- 
@@ -605,9 +606,7 @@ modlist_spatial[[16]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
 lapply(modlist_spatial, AIC)
 
 
-
-
-library(fields)
+#just use model 10
 
 for(ii in 1:3){
   
@@ -648,17 +647,17 @@ for(ii in 1:3){
 
   greys <- c(grey(0.6), grey(0.93), grey(0.99))
 
-  png(filename = paste(Preddat$Season[1], '.png'),
-      units="in", 
-      width=7, 
-      height=9, 
-      pointsize=12,res = 72)
+  # png(filename = paste(Preddat$Season[1], '.png'),
+  #     units="in", 
+  #     width=7, 
+  #     height=9, 
+  #     pointsize=12,res = 400)
   
  
   
   op<-par(no.readonly=TRUE)
   par(op)
-  par(oma=c(2,2,0,4),mar=c(3,3,2,0),mfrow=c(2,2),pch=16)
+  par(oma=c(2,2,0,4),mar=c(3,3,2,1),mfrow=c(2,2),pch=16)
   
    #  fit
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
@@ -715,11 +714,14 @@ for(ii in 1:3){
   mtext(text="Longitude",side=1,line=0,outer=TRUE)
   mtext(text="Latitude",side=2,line=0,outer=TRUE)
   
-  #image.plot(legend.only = TRUE,zlim=range(unlist(preds)), col = heat.colors(20))
+  image.plot(legend.only = TRUE,zlim=range(unlist(preds)), 
+             col = heat.colors(20), legend.mar = 0, legend.shrink = .8, 
+             legend.width = 1.2)
+ 
   
   
   
-  dev.off()
+  # dev.off()
   
   
   }

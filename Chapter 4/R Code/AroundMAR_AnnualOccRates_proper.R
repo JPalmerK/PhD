@@ -25,6 +25,22 @@ library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
 
+
+river_locs=data.frame(Rivername=c("Esk", "Dee", "South Esk", "Spey", "Tay", "Thurso", "Tweed"),
+                 Lat=c("555638", "570723", "564259", "574014", "562243", "583536", "554512"),
+                 Lon=c("-045656", "-035257"," -032659", "-045432", "-043518", "-033056", "-035341"))
+
+river_locs$LatDeg=as.numeric(substr(river_locs$Lat, 1,2)) +
+  as.numeric(substr(river_locs$Lat, 3,4))/60 + 
+  as.numeric(substr(river_locs$Lat, 5,6))/60/60
+
+river_locs$lonDeg=as.numeric(substr(river_locs$Lon, 1,3)) -
+  as.numeric(substr(river_locs$Lon, 4,5))/60 - 
+  as.numeric(substr(river_locs$Lon, 6,7))/60/60
+
+
+
+
 ### Functions  
 
 # These function calculates do backwards stepwise QIC to select the best model,
@@ -428,7 +444,7 @@ mm.unktot=as.data.frame(aggregate(UNKOcc~UnitLoc+Date, FUN=sum, data = OccTable)
 colnames(mm.unktot)[3]='UNKTot'
 
 
-mm=distinct(OccTable, Date, UnitLoc, JulienDay, GroupId, ShoreDist, Slope, Year, Month)
+mm=distinct(OccTable, Date, UnitLoc, JulienDay, GroupId, ShoreDist, Slope2, Year, Month)
 mm.bb=distinct(subset(OccTable, BBOcc>0), Date, BBOcc, UnitLoc)
 mm.fb=distinct(subset(OccTable, FBOcc>0), Date, FBOcc, UnitLoc)
 mm.unk=distinct(subset(OccTable, UNKOcc>0), Date, UNKOcc, UnitLoc)
@@ -727,10 +743,10 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     # Determine whether linear model or spline for Julien Day #
   
     modformula=list()
-    modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)))
-    modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay)))
-    modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)))
-    modformula[[4]]=as.formula(BNDTotOffset~ShoreDist+Year+JulienDay)
+    modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay))+Slope2)
+    modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay))+Slope2)
+    modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay))+Slope2)
+    modformula[[4]]=as.formula(BNDTotOffset~ShoreDist+Year+JulienDay+Slope2)
     
     QIC_val=c(Inf,Inf,Inf)
     print(ii)

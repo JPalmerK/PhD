@@ -23,9 +23,31 @@ library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
 library(geosphere)       # for distance between lat long points, estimating distance between river and locs
 
-river_locs=data.frame(Rivername=c("Esk", "Dee", "South Esk", "Spey", "Tay", "Thurso", "Tweed", "Cromarty"),
-                      Lat=c("555638", "570723", "564259", "574014", "562243", "583536", "554512", "5741454"),
-                      Lon=c("-045656", "-035257"," -032659", "-045432", "-043518", "-033056", "-035341", "-03592429"))
+river_locs=data.frame(Rivername=factor(c("Esk",
+                                  "Dee", 
+                                  "South Esk", 
+                                  "Spey",
+                                  "Tay Firth", 
+                                  "Tweed",
+                                  "Cromarty Firth",
+                                  "Ness")),
+                      Lat=c("564216",
+                            "570841",
+                            "564216",
+                            "574038",
+                            "562702",
+                            "554550",
+                            "5741454",
+                             "573439"),
+                      Lon=c("-022641",
+                            "-020337",
+                            "-022641",
+                            "-030555",
+                            "-024623",
+                            "-015901",
+                            "-035924",
+                            "-040504"))
+
 
 river_locs$LatDeg=as.numeric(substr(river_locs$Lat, 1,2)) +
   as.numeric(substr(river_locs$Lat, 3,4))/60 + 
@@ -39,49 +61,46 @@ river_locs$lonDeg=as.numeric(substr(river_locs$Lon, 1,3)) -
 
 
 # Calculate AUC, %0's id'ed and %1's ided, from Pirotta sperm whale paper- 
-# modified 
-CalcAUC<-function(mod, data_sub){
+# modified for new model
+CalcAUC<-function(mod, data_sub, BinaryResponse_var){
   
-  pr <- predict(mod, data_sub, type="response")                          # the final model is used to predict the data on the response scale (i.e. a value between 0 and 1)
-  pred <- prediction(pr, data_sub$BBOcc)                                    # to specify the vector of predictions (pr) and the vector of labels (i.e. the observed values "Pres")
-  perf <- performance(pred, measure="tpr", x.measure="fpr")          # to assess model performance in the form of the true positive rate and the false positive rate
+  pr_dat=as.data.frame(as.numeric(predict(mod, data_sub, type="response")))
+  pr_dat$labels=data_sub[, BinaryResponse_var]
+  
+  colnames(pr_dat)[1]='predictions'
+  pred_dat=prediction(pr_dat$predictions, pr_dat$labels)
+  perf <- performance(pred_dat, measure="tpr", x.measure="fpr") 
   plot(perf, colorize=TRUE, print.cutoffs.at=c(0.1,0.2,0.3,0.4,0.5)) # to plot the ROC curve
-  
-  
-  # Choice of the best cut-off probability
   
   y<-as.data.frame(perf@y.values)
   x<-as.data.frame(perf@x.values)
   fi <- atan(y/x) - pi/4                                             # to calculate the angle between the 45° line and the line joining the origin with the point (x;y) on the ROC curve
   L <- sqrt(x^2+y^2)                                                 # to calculate the length of the line joining the origin to the point (x;y) on the ROC curve
-  d <- L*sin(fi)                                                     # to calculate the distance between the 45° line and the ROC curve
-  # write.table(d,"C:\\distances.txt")                                 # to write a table with the computed distances
+  d <- L*sin(fi)        
   
-  # The table should then be opened in Microsoft Excel to find the maximum distance with the command "Sort", and the relative position (i.e. the number of the corresponding record)
-  # MAX d= 0.1127967 --> position 39
   
   alpha<-as.data.frame(perf@alpha.values)                            # the alpha values represent the corresponding cut-offs
-  Best_cutoff=alpha[which.max(unlist(d)),]                                                       # to identify the alpha value (i.e. the cut-off) that corresponds to the maximum distance between the 45° line and the curve
+  Best_cutoff=alpha[which.max(unlist(d)),] 
   
-  # Best cutoff:   0.3464173
-  # This value can now be used to build the confusion matrix:
   
   DATA<-matrix(0,nrow(data_sub),3)                                             # to build a matrix with 3 columns and n rows, where n is the dimension of the data set (here 919 - the number of rows can be checked with dim(dat)) 
   DATA<-as.data.frame(DATA)
   names(DATA)<-c("plotID","Observed","Predicted")
   DATA$plotID<-1:nrow(data_sub)                                                # the first column is filled with an ID value that is unique for each row
-  DATA$Observed<-data_sub[,names(attr(modlist[[1]]$terms, 'dataClasses')[1])]                                            # the second column reports the observed response (0s and 1s)
+  DATA$Observed<-data_sub$BBOcc                                            # the second column reports the observed response (0s and 1s)
   DATA$Predicted<-predict(mod,data_sub,type="response")                 # the third column reports the predictions
-  cmx(DATA, threshold = Best_cutoff)                                   # the identified cut-off must be used here
+  cmx(DATA, threshold = Best_cutoff)   
+  
   
   # Area under the Curve 
-  auc <- unlist(performance(pred, measure="auc")@y.values)
+  auc <- unlist(performance(pred_dat, measure="auc")@y.values)
   
   # Proportion of the presences correctly identified 
   pres=prop.table(cmx(DATA, threshold = Best_cutoff))[1,1]
   
   # Proportion of the absences correctly idenified
   abs=prop.table(cmx(DATA, threshold = Best_cutoff))[2,2]
+  
   
   
   return(c(auc, pres, abs))
@@ -127,9 +146,12 @@ OccTable$ShoreDist[OccTable$ShoreDist=="5"]='05'
 OccTable$ShoreDist=as.factor(OccTable$ShoreDist)
 
 OccTable$Year=as.factor(OccTable$Year)
+
+
+
+# Load meta data and merge slope, depth and distance to nearest river
 meta=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
 meta$UnitLoc=factor(meta$UnitLoc, levels=level_names)
-
 
 
 meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
@@ -151,13 +173,27 @@ for(ii in 1:30){
 }
 
 
-meta=merge(meta, meta2, by='UnitLoc', all.x = TRUE)
-
-
+meta=merge(meta[,c('UnitLoc', 'Depth_m')], meta2, by='UnitLoc', all.x = FALSE)
 meta_sub=subset(meta, select=c('UnitLoc', 'Slope2', 'DistToSalmonRun','RiverName', 'Depth_m' ))
+meta_sub=meta_sub[!duplicated(meta_sub[,1:ncol(meta_sub)]),]
+meta_sub$RiverDistFactor='blarg'
+# Create factor for distance to each river
 
-OccTable=merge(OccTable, meta_sub, all.x = TRUE)
+for(ii in 1:nrow(river_locs)){
+  
+  meta_sub$RiverDistFactor[meta_sub$RiverName==unique(river_locs$Rivername[ii])]=
+    order(meta_sub$DistToSalmonRun[meta_sub$RiverName==unique(river_locs$Rivername[ii])])
+  
+}
+
+
+OccTable=merge(OccTable, meta_sub, by='UnitLoc', all.x = TRUE)
 rm(meta, meta2, meta_sub)
+
+OccTable$RiverName=as.factor(OccTable$RiverName)
+
+
+
 
 OccTable$GroupId=unlist(strsplit(as.character(OccTable$UnitLoc), split = "_"))[seq(1,(nrow(OccTable)*2)-1,2)]
 
@@ -246,6 +282,19 @@ OccTable_daily$TotDet=(OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$
 
 OccTable_daily$BNDTotOffset[is.na(OccTable_daily$BNDTotOffset)]=0
 
+OccTable_daily$dateunit=as.factor(paste(OccTable_daily$Date, OccTable_daily$UnitLoc))
+OccTable_daily$ScaleJd=scale(OccTable_daily$JulienDay)
+# Add season
+OccTable_daily$Season=NA
+OccTable_daily$Season[OccTable_daily$Month < 6]='Spring'
+OccTable_daily$Season[OccTable_daily$Month > 8]='Autum'
+OccTable_daily$Season[which(is.na(OccTable_daily$Season))]='Summer'
+OccTable_daily$Season=as.factor(OccTable_daily$Season)
+
+OccTable_daily$CentredMonth=OccTable_daily$Month-median(median(unique(OccTable_daily$Month)))
+OccTable_daily$yearseason=as.factor(paste(OccTable_daily$Year, OccTable_daily$Season))
+OccTable_daily$SeasonRiver=as.factor(paste(OccTable_daily$Season, OccTable_daily$RiverName))
+
 rm(mm, mm.bb, mm.fb, mm.unk, mm.bbtot, mm.fbtot, mm.unktot)
 
 
@@ -294,7 +343,7 @@ ggplot(data=mm, aes(x=med, y=BBOcc, color=ShoreDist)) +
 rm(mm)
 
 
-# 5)  Visualise the daily autocorrelation for all units ################################################################################
+# 5)  Visualise the daily autocorrelation for all units and look into correlation ################################################################################
 
 
 
@@ -324,7 +373,18 @@ for(ii in 1:30){
 
 # Interleaved histograms
 
-acf_val$jlag=jitter(acf_val$lag)
+acf_val$jlag=ifelse(acf_val$ShoreDist=='05', acf_val$lag, acf_val$lag+.2)
+acf_val$jlag[acf_val$ShoreDist=='15']=acf_val$lag[acf_val$ShoreDist=='15']+.4
+
+  jitter(acf_val$lag)
+
+
+png(filename = paste('ACF Values.png'),
+      units="in", 
+       width=6, 
+      height=6, 
+      pointsize=12,res = 400)
+  
 
 ggplot(acf_val, aes(x=lag, y=acf_score)) +
   facet_wrap(~GroupId) +
@@ -335,65 +395,92 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
                      values=cbbPalette) +
   geom_hline(yintercept = c(0.1, -.1), lty=2, color='red') +
   theme_bw() +
-  xlab('Number of Days')+
-  ylab('ACF')
+    xlab('Lag (Days)')+
+    ylab('Autocorrelation Score')
+
+dev.off()
 
 
 
 
+cor(OccTable_daily$Depth_m, OccTable_daily$DistToSalmonRun, method='pearson') # correlation -0.4
+cor(OccTable_daily$Depth_m, OccTable_daily$Slope2, method='pearson') 
+cor(OccTable_daily$DistToSalmonRun, OccTable_daily$Slope2, method='pearson') 
 
 
 
 
 # 2) Spatial model #####
-OccTable_daily$dateunit=as.factor(paste(OccTable_daily$Date, OccTable_daily$UnitLoc))
 
-mod=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun) + scale(Depth_m) ,
+
+mod=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun) + scale(Depth_m) + RiverName,
          correlation=corAR1(form = ~1|dateunit),
          family=binomial,
          data=OccTable_daily,
          random=list(UnitLoc=~1))
 
-mod1=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) + s(scale(DistToSalmonRun), k = 3) + s(scale(Depth_m), k = 3) ,
+mod1=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) +
+            s(scale(DistToSalmonRun), k = 3) + s(scale(Depth_m), k = 3) + RiverName,
          correlation=corAR1(form = ~1|dateunit),
          family=binomial,
          data=OccTable_daily,
          random=list(UnitLoc=~1))
 
-mod2=gamm(BNDTotOffset~ scale(Slope2) + s(scale(DistToSalmonRun), k = 3) + s(scale(Depth_m), k = 3) ,
+mod2=gamm(BNDTotOffset~ scale(Slope2) + s(scale(DistToSalmonRun), k = 3) + s(scale(Depth_m), k = 3) + RiverName,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
 
-mod3=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) + scale(DistToSalmonRun) + s(scale(Depth_m), k = 3) ,
+mod3=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) + scale(DistToSalmonRun) + s(scale(Depth_m), k = 3) + RiverName ,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
 
-mod4=gamm(BNDTotOffset~ s(scale(Slope2), k=3) + s(scale(DistToSalmonRun), k=3) + scale(Depth_m) ,
+mod4=gamm(BNDTotOffset~ s(scale(Slope2), k=3) + s(scale(DistToSalmonRun), k=3) + scale(Depth_m) + RiverName,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
 
 
-mod5=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) + scale(DistToSalmonRun) + scale(Depth_m) ,
+mod5=gamm(BNDTotOffset~ s(scale(Slope2), k = 3) + scale(DistToSalmonRun) + scale(Depth_m) + RiverName,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
-mod6=gamm(BNDTotOffset~ scale(Slope2) + s(scale(DistToSalmonRun), k = 3) + scale(Depth_m) ,
+
+mod6=gamm(BNDTotOffset~ scale(Slope2) + s(scale(DistToSalmonRun), k = 3) + scale(Depth_m) + RiverName ,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
-mod7=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun) + s(scale(Depth_m), k = 3) ,
+
+mod7=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun) + s(scale(Depth_m), k = 3) + RiverName ,
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
           random=list(UnitLoc=~1))
+
+mod8=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun):RiverName + s(scale(Depth_m), k = 3),
+          correlation=corAR1(form = ~1|dateunit),
+          family=binomial,
+          data=OccTable_daily,
+          random=list(UnitLoc=~1))
+
+mod9=gamm(BNDTotOffset~ scale(Slope2) + scale(DistToSalmonRun):RiverName,
+          correlation=corAR1(form = ~1|dateunit),
+          family=binomial,
+          data=OccTable_daily,
+          random=list(UnitLoc=~1))
+
+mod10=gamm(BNDTotOffset~ scale(Slope2) + scale(Depth_m):RiverName,
+          correlation=corAR1(form = ~1|dateunit),
+          family=binomial,
+          data=OccTable_daily,
+          random=list(UnitLoc=~1))
+
 
 
 
@@ -401,33 +488,52 @@ modlist_daily=list()
 modlist_daily[[1]]=mod
 modlist_daily[[2]]=mod1
 modlist_daily[[3]]=mod2
-modlist_daily[[4]]=mod3
+modlist_daily[[4]]=mod2
 modlist_daily[[5]]=mod4
 modlist_daily[[6]]=mod5
 modlist_daily[[7]]=mod6
 modlist_daily[[8]]=mod7
+modlist_daily[[9]]=mod8
+modlist_daily[[10]]=mod9
+modlist_daily[[11]]=mod10
 
-mm=unlist(lapply(modlist_daily, AIC))
 
 saveRDS(modlist_daily, "Daily_gamm.rds")
-modlist=readRDS('C:\\Users\\charlotte\\Documents\\GitHub\\PhD\\Chapter 4\\R Code\\ModelLists.rds')
-
-# Spatial Models ################################################################
+modlist_daily=readRDS('C:\\Users\\charlotte\\Documents\\GitHub\\PhD\\Chapter 4\\R Code\\Daily_gamm.rds')
 
 
-smod=gamm(BNDTotOffset~ s(JulienDay, by=UnitLoc, k=3),
+# Make Model Selection table
+modelselection=data.frame(Formula= unlist(lapply(modlist_daily, FUN = function(x){Reduce(paste, deparse(formula(x)))})),
+                          AIC=unlist(lapply(modlist_daily, AIC)))
+
+modelselection$dAIC=modelselection$AIC-min(modelselection$AIC)
+
+
+# Use AUC to assess model fit
+vals=CalcAUC(mod6, OccTable_daily, 'BBOcc')
+
+
+anova(mod9$lme)
+anova(modlist_daily[[10]]$gam)
+
+
+
+# Temporal Models ################################################################
+
+
+smod=gamm(BNDTotOffset~ s(ScaleJd, by=UnitLoc, k=5),
          correlation=corAR1(form = ~1|dateunit),
          family=binomial,
          data=OccTable_daily,
          random=list(UnitLoc=~1))
 
-smod1=gamm(BNDTotOffset~ s(JulienDay, by=GroupId, k=3),
+smod1=gamm(BNDTotOffset~ s(ScaleJd, by=GroupId, k=10),
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
-          random=list(UnitLoc=~1))
+          random=list(UnitLoc=~1), niterPQL = 10)
 
-smod2=gamm(BNDTotOffset~ s(JulienDay, by=ShoreDist, k=3),
+smod2=gamm(BNDTotOffset~ s(ScaleJd, by=ShoreDist, k=5),
           correlation=corAR1(form = ~1|dateunit),
           family=binomial,
           data=OccTable_daily,
@@ -440,14 +546,441 @@ modlist_daily_time[[2]]=smod1
 modlist_daily_time[[3]]=smod2
 
 
-mm=unlist(lapply(modlist_daily_time, AIC))
+AIC(smod,  smod2)
+
 
 saveRDS(modlist_daily_time, "Daily_gamm_time.rds")
 modlist=readRDS('C:\\Users\\charlotte\\Documents\\GitHub\\PhD\\Chapter 4\\R Code\\ModelLists.rds')
 
 
 
+#############################################################################
 
 
-           
-           
+
+
+
+# Fit full model Combination of the spatial and temporal models
+
+
+
+fullmodel0= gamm(BNDTotOffset ~  scale(DistToSalmonRun):RiverName + RiverName+# spatial
+                                     s(ScaleJd, k=3, bs='ts') + Year,                         # temporal
+                                 correlation=corAR1(form = ~1|dateunit),
+                                 family=binomial,
+                                 data=OccTable_daily)
+
+
+fullmodel1= gamm(BNDTotOffset ~ scale(Slope2) + scale(DistToSalmonRun):RiverName + RiverName+# spatial
+                  s(ScaleJd, by=RiverName, bs='ts') + Year,                                # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)
+
+fullmodel2= gamm(BNDTotOffset ~ scale(Slope2) + scale(DistToSalmonRun)+RiverName + # spatial
+                   s(ScaleJd, by=RiverName, bs='ts') + Year,                                # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)
+
+fullmodel3= gamm(BNDTotOffset ~ scale(Slope2) + scale(DistToSalmonRun):RiverName + RiverName + # spatial
+                   s(ScaleJd, by=RiverName, bs='ts') ,                                # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, method = 'REML')
+
+
+fullmodel4= gamm(BNDTotOffset ~ scale(Slope2) + scale(DistToSalmonRun)+Year:RiverName + RiverName+# spatial
+                  s(ScaleJd, k=3, bs='ts') + Year,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)
+# 
+# fullmodel5= gamm(BNDTotOffset ~ scale(Slope2) + s(scale(DistToSalmonRun), k=3,bs='ts')+ RiverName+# spatial
+#                   s(ScaleJd, by=RiverName, k=3),                         # temporal
+#                 correlation=corAR1(form = ~1|dateunit),
+#                 family=binomial,
+#                 data=OccTable_daily)  
+# 
+# fullmodel6= gamm(BNDTotOffset ~ scale(Slope2) +  RiverName+# spatial
+#                   s(ScaleJd, by=RiverName, k=3, bs='ts') ,                         # temporal
+#                 correlation=corAR1(form = ~1|dateunit),
+#                 family=binomial,
+#                 data=OccTable_daily)  
+
+# fullmodel5= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, , bs='ts')+ RiverName+# spatial
+#                   s(ScaleJd, by=RiverName, k=3, bs='ts'),                         # temporal
+#                 correlation=corAR1(form = ~1|dateunit),
+#                 family=binomial,
+#                 data=OccTable_daily)  
+
+fullmodel7= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, bs='ts')+ ShoreDist+# spatial
+                  s(ScaleJd, by=ShoreDist, k=3, bs='ts'),                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)  
+
+
+fullmodel15= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts')  +  Season,                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+fullmodel21= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts')  +  Season + Year,                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+fullmodel17= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun),  by=Season, k=3, bs='ts')  +  Season + scale(Depth_m),                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+
+fullmodel18= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts')  +  Season + s(scale(Depth_m), k=3, bs='ts'),                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+fullmodel20= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts')  +  Season + s(scale(Slope2), k=3, bs='ts'),                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+fullmodel19= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, bs='ts')  +  Season + s(scale(Slope2), k=3, bs='ts'),                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+
+fullmodel16= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, bs='ts')  +  Season + scale(Slope2),                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+
+fullmodel14= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts') + scale(Slope2) +  Season,                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily)  
+
+fullmodel8= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts') + Year+ scale(Slope2) + Season,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)  
+
+fullmodel12= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts') + RiverName + scale(Slope2) + Season,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)  
+
+fullmodel13= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), by=Season, k=3, bs='ts') + RiverName +  Season,                         # temporal
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily) 
+
+
+
+fullmodel9= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, bs='ts') + SeasonRiver,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)  
+
+fullmodel10= gamm(BNDTotOffset ~ s(scale(DistToSalmonRun), k=3, bs='ts')+ RiverName+# spatial
+                  s(ScaleJd, by=RiverName, k=3, bs='ts'),                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)  
+
+fullmodel11= gamm(BNDTotOffset ~ scale(Slope2)  + s(scale(DistToSalmonRun), k=3, bs='ts')+ # spatial
+                SeasonRiver,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily) 
+
+fullmodel22 =gamm(BNDTotOffset ~ 
+                te(ScaleJd, scale(DistToSalmonRun), k=3, by=RiverName, bs = 'ts') +
+                  RiverName, method="REML",   select=TRUE,                     # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)
+
+
+
+
+
+fullmodel24 =gamm(BNDTotOffset ~ 
+                    te(ScaleJd, scale(DistToSalmonRun), k=3, by=RiverName, bs = 'ts') +
+                    RiverName, , method="REML",   select=TRUE,                     # temporal
+                  correlation=corAR1(form = ~1|dateunit),
+                  family=binomial,
+                  data=OccTable_daily, 
+                  random=list(UnitLoc=~1))
+
+fullmodel23 =gamm(BNDTotOffset ~ 
+                  s(ScaleJd, k=3, bs='ts', by=SeasonRiver) +
+                 SeasonRiver,                         # temporal
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily)
+
+
+fullmodel24 =gamm(BNDTotOffset ~ 
+                    s(ScaleJd, k=5, bs='ts', by=RiverName) +
+                    RiverName + Slope2,                         # temporal
+                  correlation=corAR1(form = ~1|dateunit),
+                  family=binomial,
+                  data=OccTable_daily)
+
+# 
+# fullmodel24 =gamm(BNDTotOffset ~ 
+#                   ti(ScaleJd, scale(DistToSalmonRun), k=3, bs='ts', by=RiverName) + #can't converge
+#                   RiverName,                         # temporal
+#                 correlation=corAR1(form = ~1|dateunit),
+#                 family=binomial,
+#                 data=OccTable_daily)
+
+
+
+
+
+# 
+# fullmode9= gamm(BNDTotOffset ~ UnitLoc +# spatial
+#                   s(ScaleJd, by=UnitLoc, k=5),                         # Cant Converge
+#                 correlation=corAR1(form = ~1|dateunit),
+#                 family=binomial,
+#                 data=OccTable_daily)  
+
+
+modlist=list(fullmodel0, fullmodel1, fullmodel2, fullmodel3, fullmodel4,  
+                           fullmodel8, fullmodel9, fullmodel10, fullmodel11, fullmodel12, fullmodel13, fullmodel14,fullmodel15,
+                          fullmodel16, fullmodel17, fullmodel18, fullmodel19, fullmodel20, fullmodel21,
+             fullmodel22,fullmodel23)
+
+mm=data.frame(AIC(fullmodel0, fullmodel1, fullmodel2, fullmodel3, fullmodel4,  
+                  fullmodel8, fullmodel9, fullmodel10, fullmodel11, fullmodel12, fullmodel13, fullmodel14,fullmodel15,
+                  fullmodel16, fullmodel17, fullmodel18, fullmodel19, fullmodel20, fullmodel21,
+                  fullmodel22,fullmodel23))
+
+mm[order(mm$AIC),]
+
+
+ModTable_AIC=data.frame(Formula=unlist(lapply(modlist, function(x){Reduce(paste,deparse(formula(x)))})))
+ModTable_AIC$AIC=as.numeric(lapply(modlist, function(x){round(AIC(x),digits = 0)}))
+ModTable_AIC$DeltaAIC=ModTable_AIC$AIC-min(ModTable_AIC$AIC)
+ModTable_AIC$ModNames=rownames(mm)
+ModTable_AIC$AUC=0 # Area under the Curve 
+ModTable_AIC$Pres=0 # Proportion of the presences correctly identified 
+ModTable_AIC$Abs=0 # Proportion of the absences correctly idenified
+
+
+
+
+for(ii in 1:length(modlist)){
+  AUC_vals=CalcAUC(modlist[[ii]], OccTable_daily, 'BBOcc')
+  ModTable_AIC$AUC[ii]=round(AUC_vals[1], 2)
+  ModTable_AIC$Pres[ii]=round(AUC_vals[2], 2)
+  ModTable_AIC$Abs[ii]=round(AUC_vals[3], 2)
+  
+}
+
+
+
+
+# Get STrath... coefficients 
+coefs <- data.frame(coef(summary(fullmode15$lme)))
+coefs$df.Satt <- coef(summary(fullmode15$lme))[, 5]
+coefs$df.Satt <- coef(summary(fullmode15))[, 3]
+
+
+## Look at Model Performance #################################################################
+
+# Table to store model performance #
+
+ModelTable=data.frame(GroupId=levels(OccTable_daily$Unit))
+ModelTable$ModelFormula='none'
+ModelTable$AIC=0
+ModelTable$AUC=0 # Area under the Curve 
+ModelTable$Pres=0 # Proportion of the presences correctly identified 
+ModelTable$Abs=0 # Proportion of the absences correctly idenified
+
+
+
+# Fill in the Model Table
+for(ii in 1:130){
+  
+  data_sub=subset(OccTable_daily, UnitLoc==unique(OccTable_daily$UnitLoc)[ii])
+  data_sub$ShoreDist=factor(data_sub$ShoreDist,
+                            levels=c('05', '10', '15'))
+  data_sub <- droplevels(data_sub)
+  
+  
+  mod=fullmode15
+  ModelTable$ModelFormula[ii]=Reduce(paste, deparse(formula(mod)))
+  ModelTable$AIC[ii]= AIC(mod)
+  
+  AUC_vals= CalcAUC(mod, data_sub, "BBOcc")
+  ModelTable$AUC[ii]=AUC_vals[1]
+  ModelTable$Pres[ii]=AUC_vals[2]
+  ModelTable$Abs[ii]=AUC_vals[3]
+  rm(mod)
+}
+
+
+
+
+
+
+plot(fullmodel22$gam, scheme=2, asp=1, select=1, trans=inv.logit)
+
+
+
+
+# generate data for plotting
+
+RiverName=factor()
+dist=numeric()
+JulienDay=numeric()
+
+# Add distance ranges 
+for (ii in 1:length(unique(OccTable_daily$RiverName))){
+  
+  
+  data_sub=OccTable_daily[(OccTable_daily$RiverName==unique(OccTable_daily$RiverName)[ii]),]
+  
+  
+  # River Names
+  RiverName=c(RiverName, 
+              rep(as.character(data_sub$RiverName[1]), 200))
+  
+  # Distance Ranges
+  range_vals=range(data_sub$DistToSalmonRun)
+  
+  # Monitoring Ranges
+  Jrange=range(data_sub$JulienDay)
+  
+  dist=c(dist,
+         seq(from=range_vals[1], to=range_vals[2], length.out = 100))
+  
+  JulienDay=c(JulienDay,
+              seq(from=Jrange[1], to=Jrange[2], length.out = 100))
+}
+
+
+
+fitdata=data.frame(JulienDay=JulienDay,
+                  DistToSalmonRun=dist,
+                  RiverName=RiverName)
+
+fitdata$ScaledDist=scale(fitdata$DistToSalmonRun)
+fitdata$ScaleJd=scale(fitdata$JulienDay)
+
+  # # predictions for simulated data 
+  # preds=predict(fullmodel22, fitdata , type="response", se=TRUE)
+  # fitdata_preds=cbind(fitdata, preds)
+
+
+
+library(akima)
+library(colorspace)
+my.heat.colors <- function(x) { (diverge_hcl(x)) }
+
+# Create the matricies and plot 
+for(ii in 1:length(unique(OccTable_daily$RiverName))){
+  
+
+  data_sub=subset(OccTable_daily, RiverName==unique(OccTable_daily$RiverName)[ii])
+  data_sub=droplevels(data_sub)
+  
+  myjd <- matrix(data=seq(from=min(data_sub$ScaleJd), 
+                          to=max(data_sub$ScaleJd), length=100),
+                 nrow=100, ncol=100)    
+  
+  mydist <- t(matrix(data=seq(from=min(data_sub$DistToSalmonRun),
+                              to=max(data_sub$DistToSalmonRun), length=100),
+                     nrow=100, ncol=100)) 
+  
+  fitdata <- data.frame(DistToSalmonRun=as.vector(mydist),
+                        ScaleJd=as.vector(myjd), 
+                        RiverName=as.character(data_sub$RiverName[1]) )
+  
+  mypredict.exit <- predict(fullmodel22, fitdata, type="response")  
+  
+  mypredict.exit <- matrix(mypredict.exit, nrow=c(100,100))
+
+  mypredict.exit=mypredict.exit[!duplicated(mypredict.exit)]
+  
+  filled.contour(
+                    z=mypredict.exit)
+  ,  nlevels=15, color=my.heat.colors)
+  ,
+                 main=fitdata_temp$RiverName[1], 
+                 cex.main=2, las=2,
+                 ylab="Distance from Feature (km)", 
+                 xlab="Julian Day of Year",
+                 plot.axes={
+                   axis(1, at=c(-2,-1,0,1,2), pos=0, 
+                        labels=as.numeric(round(quantile(fitdata_temp$JulienDay,probs = seq(0,1,length.out = 5)))),
+                        las=0, col="black")
+                   axis(2, at=c(0,1,2,3,4,5), pos=-2, labels=c(0,1,2,3,4,5), las=0, col="black")
+                   rect(-0.83, 1.75, 0.83, 3.45, border="black", lty="dashed", lwd=2)
+                 },)
+  
+  # rug(x=unique(OccTable_daily$DistToSalmonRun[OccTable_daily$RiverName==fitdata_preds$RiverName[1]])/1000,
+  #     side = 2)
+  # 
+  
+}
+
+
+
+
+  
+mypredict.exit <- matrix(mypredict.exit, nrow=c(100,100))
+
+
+
+
+
+
+
+
+filled.contour()
+fitdata_temp=fitdata_temp[order(fitdata_temp$x),]
+contour(x = fitdata_temp$x, y = fitdata_temp$y, fitdata_temp$fit)
+
+
+library(RColorBrewer)
+#png(file="AstrosExitVelo.png", width=600, height=675)
+
+
+
+
+
+
+filled.contour(z=matrix(mypredict.exit, nrow=c(100,100)))
+
+
+
+,
+               
+               zlim=c(85,92), nlevels=15,
+               color=colorRampPalette(rev(brewer.pal(11, "RdYlBu"))), 
+               main="Houston Astros 2015 Exit Velocity", cex.main=2, xlab="Horizontal Location (ft., Umpire's View)", ylab="Vertical Location (ft.)",
+               
+               plot.axes={
+                 axis(1, at=c(-2,-1,0,1,2), pos=0, labels=c(-2,-1,0,1,2), las=0, col="black")
+                 axis(2, at=c(0,1,2,3,4,5), pos=-2, labels=c(0,1,2,3,4,5), las=0, col="black")
+                 rect(-0.83, 1.75, 0.83, 3.45, border="black", lty="dashed", lwd=2)
+               },
+               key.axes={
+                 ylim=c(0,1.0)
+                 axis(4, at=c(85,86,87,88,89,90,91,92), labels=c(85,86,87,88,89,90,91,92), pos=1, las=0, col="black")
+               })
+text(1.4, 2.5, "Exit Velocity", cex=1.1, srt=90)
+#dev.off()
+
+
+
+
+
