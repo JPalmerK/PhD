@@ -281,8 +281,6 @@ points(dat[!is.na(dat$`Cromarty Firth`),], pch = 21, col = "Green",
        bg = "green", cex = 1.3)
 
 
-dat$DistToSalmonRun=rowSums(as.data.frame(dat@data[,5:10]), na.rm = TRUE)
-
 # Make Spatial Models ######################################################################################
 
 # Clear out some crap 
@@ -609,9 +607,7 @@ lapply(modlist_spatial, AIC)
 
 
 
-
-
-par(mfrow=c(1,2))
+library(fields)
 
 for(ii in 1:3){
   
@@ -624,11 +620,11 @@ for(ii in 1:3){
                      DistToShore=dat1$DistToShore,
                      Season= unique(OccTable_daily$Season)[ii])
   
-  preds=predict(modlist_spatial[[10]], Preddat, se.fit=TRUE, type='response')
+  preds=predict(modlist_spatial[[10]], Preddat, se.fit=TRUE)
   preds$UCI=preds$fit+(1.96*preds$se.fit)
   preds$LCI=preds$fit-(1.96*preds$se.fit)
   
-  #preds[]<-lapply(preds, inv.logit)
+  preds[]<-lapply(preds, inv.logit)
 
   dat1=cbind(dat1, preds)
 
@@ -644,7 +640,7 @@ for(ii in 1:3){
   dat1$ColUCI <- heat.colors(20)[as.numeric(cut(dat1$UCI,
                                                 breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
   
-    dat1$Season=as.character(Preddat$Season)
+  dat1$Season=as.character(Preddat$Season)
 
   # Plot the bathymetry
   blues <- c("lightsteelblue4", "lightsteelblue3",
@@ -652,18 +648,32 @@ for(ii in 1:3){
 
   greys <- c(grey(0.6), grey(0.93), grey(0.99))
 
-  #  fit
+  png(filename = paste(Preddat$Season[1], '.png'),
+      units="in", 
+      width=7, 
+      height=9, 
+      pointsize=12,res = 72)
+  
+ 
+  
+  op<-par(no.readonly=TRUE)
+  par(op)
+  par(oma=c(2,2,0,4),mar=c(3,3,2,0),mfrow=c(2,2),pch=16)
+  
+   #  fit
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
      bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
                  c(min(NorthSea), 1, "darkblue", "lightblue")),
      main= paste(Preddat$Season[1], 'fit'))
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
-
+  
   points(x = dat1$Depth.lon, y=dat1$Depth.lat,
        pch = 20,
        col = dat1$Col, main=Preddat$Season[1])
-  points(river_locs, pch=18, col='blue')
+  #points(river_locs, pch=18, col='blue')
+  
+  #image.plot(legend.only = TRUE,zlim=range(unlist(preds)), col = heat.colors(20),)
 
   points(meta2,
          pch = 18,
@@ -700,6 +710,16 @@ for(ii in 1:3){
   points(meta2,
          pch = 18,
          col = 'black')
+  
+  
+  mtext(text="Longitude",side=1,line=0,outer=TRUE)
+  mtext(text="Latitude",side=2,line=0,outer=TRUE)
+  
+  #image.plot(legend.only = TRUE,zlim=range(unlist(preds)), col = heat.colors(20))
+  
+  
+  
+  dev.off()
   
   
   }
