@@ -193,7 +193,7 @@ dat$Depth=get.depth(NorthSea, cbind(dat$Lon, dat$Lat), locator = FALSE)
 dat <- dat[dat@data$Depth.depth < 1,]
 
 # Get distane to nearest shore
-dat$DistToShore= mm
+dat$DistToShore= dist2isobath(NorthSea, dat$Depth.lon , dat$Depth.lat, isobath=0, locator=FALSE)
   
 # Get slope values
 dat$Slope=raster::extract(Slope, dat)
@@ -210,9 +210,9 @@ for(ii in 1:length(unique(meta2$RiverName))){
 }
 
 # Calculate minimum distances 
-dat$DistToSalmonRun=apply(as.data.frame(dat@data[,5:10]), 1, FUN=min)
-dat$RiverName=apply(as.data.frame(dat@data[,5:10]), 1, 
-                    FUN=function(x){unique(meta2$RiverName)[which.min(x)]})
+dat$DistToSalmonRun=apply(as.data.frame(dat@data[,6:11]), 1, FUN=min)
+dat$RiverName=apply(as.data.frame(dat@data[,6:11]), 1, 
+                    FUN=function(x){colnames(dat@data)[6:11][which.min(x)]})
   
   
   # Create River Database for localisation
@@ -606,69 +606,111 @@ modlist_spatial[[16]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
 
 lapply(modlist_spatial, AIC)
 
-# Filter by distance
-dat1=dat[dat$DistToShore<(max(meta2$DistToShore)+2000),]
-
-
-
-Preddat=data.frame(SlopeMap=dat1$Slope, 
-                   Depth_m=dat1$Depth.depth,
-                   DistToSalmonRun=dat1$DistToSalmonRun,
-                   BNDTotOffset=rep(0, nrow(dat1)),
-                   DistToShore=dat1$DistToShore,
-                   Season='Spring')
-Preddat=rbind(Preddat,
-              data.frame(SlopeMap=dat1$Slope, 
-                         Depth_m=dat1$Depth.depth,
-                         DistToSalmonRun=dat1$DistToSalmonRun,
-                         BNDTotOffset=rep(0, nrow(dat1)),
-                         DistToShore=dat1$DistToShore,
-                         Season='Summer') )
-Preddat=rbind(Preddat,
-              data.frame(SlopeMap=dat1$Slope, 
-                         Depth_m=dat1$Depth.depth,
-                         DistToSalmonRun=dat1$DistToSalmonRun,
-                         BNDTotOffset=rep(0, nrow(dat1)),
-                         DistToShore=dat1$DistToShore,
-                         Season='Autum') )
 
 
 
 
 
-preds=predict(modlist_spatial[[10]], Preddat, type='response', se.fit=TRUE)
-preds$UCI=preds$fit+(1.96*preds$se.fit)
-preds$LCI=preds$fit-(1.96*preds$se.fit)
+par(mfrow=c(1,2))
 
-dat1=cbind(rbind(dat1, dat1, dat1), preds)
+for(ii in 1:3){
+  
+  # Filter by distance
+  dat1=dat[dat$DistToShore<(max(meta2$DistToShore)+2000),]
+  Preddat=data.frame(SlopeMap=dat1$Slope, 
+                     Depth_m=dat1$Depth.depth,
+                     DistToSalmonRun=dat1$DistToSalmonRun,
+                     BNDTotOffset=rep(0, nrow(dat1)),
+                     DistToShore=dat1$DistToShore,
+                     Season= unique(OccTable_daily$Season)[ii])
+  
+  preds=predict(modlist_spatial[[10]], Preddat, se.fit=TRUE, type='response')
+  preds$UCI=preds$fit+(1.96*preds$se.fit)
+  preds$LCI=preds$fit-(1.96*preds$se.fit)
+  
+  #preds[]<-lapply(preds, inv.logit)
 
-rbPal <- colorRampPalette(c('red','blue'))
-dat1$Col <- rbPal(10)[as.numeric(cut(dat1$fit,breaks = 20))]
-dat1$Season=as.character(Preddat$Season)
+  dat1=cbind(dat1, preds)
 
-# Plot the bathymetry
-blues <- c("lightsteelblue4", "lightsteelblue3",
+  rbPal <- colorRampPalette(c('red','blue'))
+  #dat1$Col <- rbPal(10)[as.numeric(cut(dat1$fit,breaks = 20))]
+
+  dat1$Col <- heat.colors(20)[as.numeric(cut(dat1$fit,
+                                             breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+
+  dat1$ColLCI <- heat.colors(20)[as.numeric(cut(dat1$LCI,
+                                             breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+  
+  dat1$ColUCI <- heat.colors(20)[as.numeric(cut(dat1$UCI,
+                                                breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+  
+    dat1$Season=as.character(Preddat$Season)
+
+  # Plot the bathymetry
+  blues <- c("lightsteelblue4", "lightsteelblue3",
            "lightsteelblue2", "lightsteelblue1")
 
-greys <- c(grey(0.6), grey(0.93), grey(0.99))
+  greys <- c(grey(0.6), grey(0.93), grey(0.99))
 
-# Spring
-plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
+  #  fit
+  plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
      bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
                  c(min(NorthSea), 1, "darkblue", "lightblue")),
-     main=Preddat$Season[1])
+     main= paste(Preddat$Season[1], 'fit'))
+  
+  scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
+
+  points(x = dat1$Depth.lon, y=dat1$Depth.lat,
+       pch = 20,
+       col = dat1$Col, main=Preddat$Season[1])
+  points(river_locs, pch=18, col='blue')
+
+  points(meta2,
+         pch = 18,
+         col = 'black')
+
+  #  LCI
+  plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
+       bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
+                   c(min(NorthSea), 1, "darkblue", "lightblue")),
+       main=paste(Preddat$Season[1], 'LCI'))
+  
+  scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
+  
+  points(x = dat1$Depth.lon, y=dat1$Depth.lat,
+         pch = 20,
+         col = dat1$ColLCI, main=Preddat$Season[1])
+  
+  points(meta2,
+         pch = 18,
+         col = 'black')
+  
+  # UCI
+  plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
+       bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
+                   c(min(NorthSea), 1, "darkblue", "lightblue")),
+       main=paste(Preddat$Season[1], 'UCI'))
+  
+  scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
+  
+  points(x = dat1$Depth.lon, y=dat1$Depth.lat,
+         pch = 20,
+         col = dat1$ColUCI, main=Preddat$Season[1])
+  
+  points(meta2,
+         pch = 18,
+         col = 'black')
+  
+  
+  }
 
 
-points(x = dat1$Depth.lon[dat1$Season=='Spring'], y=dat1$Depth.lat[dat1$Season=='Spring'],
-     pch = 20,
-     col = dat1$Col, main=Preddat$Season[1])
-
-points(meta2,
-       pch = 18,
-       col = 'black')
 
 
-# Summer
+
+
+
+# Summer UCI
 plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
      bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
                  c(min(NorthSea), 1, "darkblue", "lightblue")),
