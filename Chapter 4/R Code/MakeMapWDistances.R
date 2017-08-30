@@ -647,11 +647,11 @@ for(ii in 1:3){
 
   greys <- c(grey(0.6), grey(0.93), grey(0.99))
 
-  # png(filename = paste(Preddat$Season[1], '.png'),
-  #     units="in", 
-  #     width=7, 
-  #     height=9, 
-  #     pointsize=12,res = 400)
+   png(filename = paste(Preddat$Season[1], '.png'),
+       units="in", 
+       width=7, 
+       height=9, 
+       pointsize=12,res = 400)
   
  
   
@@ -668,7 +668,7 @@ for(ii in 1:3){
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
   points(x = dat1$Depth.lon, y=dat1$Depth.lat,
-       pch = 20,
+       pch = 15, cex=.18,
        col = dat1$Col, main=Preddat$Season[1])
   #points(river_locs, pch=18, col='blue')
   
@@ -687,7 +687,7 @@ for(ii in 1:3){
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
   points(x = dat1$Depth.lon, y=dat1$Depth.lat,
-         pch = 20,
+         pch = 15, cex=.18,
          col = dat1$ColLCI, main=Preddat$Season[1])
   
   points(meta2,
@@ -703,7 +703,7 @@ for(ii in 1:3){
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
   points(x = dat1$Depth.lon, y=dat1$Depth.lat,
-         pch = 20,
+         pch = 15, cex=.18,
          col = dat1$ColUCI, main=Preddat$Season[1])
   
   points(meta2,
@@ -721,7 +721,7 @@ for(ii in 1:3){
   
   
   
-  # dev.off()
+   dev.off()
   
   
   }
