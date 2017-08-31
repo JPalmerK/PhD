@@ -9,6 +9,7 @@
 
 # This code investigates the various models that look at the different occupancy distributions
 # incorporated by the data 
+# Outdated !!! Use Mapping
 rm(list=ls())
 library(boot)            # for inv.logit
 library(mgcv)
@@ -743,10 +744,10 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     # Determine whether linear model or spline for Julien Day #
   
     modformula=list()
-    modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay))+Slope2)
-    modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay))+Slope2)
-    modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay))+Slope2)
-    modformula[[4]]=as.formula(BNDTotOffset~ShoreDist+Year+JulienDay+Slope2)
+    modformula[[1]]=as.formula(BNDTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[2]]=as.formula(BNDTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[3]]=as.formula(BNDTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[4]]=as.formula(BNDTotOffset~ShoreDist+Year+JulienDay)
     
     QIC_val=c(Inf,Inf,Inf)
     print(ii)
@@ -931,7 +932,7 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     geom_line(data=subset(fit, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=fit,aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Occupancy 2013' )+
+    ggtitle('Daily Occupancy ' )+
     theme(plot.title = element_text(hjust = 0.5))
   
   
@@ -996,6 +997,12 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
   
   
   # Only 2013
+  png(filename = paste('2013 Occupancy.png'),
+      units="in", 
+      width=7, 
+      height=9, 
+      pointsize=12,res = 400)
+  
   ggplot(data=subset(OccTable_daily_wDetections, Year==2013)) +
     theme_bw() +
     facet_wrap(~GroupId) +
@@ -1004,10 +1011,18 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     geom_line(data=subset(fit, Year==2013), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2013),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates 2013' )+
+    ggtitle('Daily Occupancy Rates 2013' )+
     ylab('P(BND)')+
     theme(plot.title = element_text(hjust = 0.5))
+  
+  dev.off()
     
+  
+  png(filename = paste('2014 Occupancy.png'),
+      units="in", 
+      width=7, 
+      height=9, 
+      pointsize=12,res = 400)
   
   ggplot(data=subset(OccTable_daily_wDetections, Year==2014)) +
     theme_bw() +
@@ -1017,11 +1032,17 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     geom_line(data=subset(fit, Year==2014), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2014),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates 2014')+
+    ggtitle('Daily Occupancy Rates 2014')+
     ylab('P(BND)')+
     theme(plot.title = element_text(hjust = 0.5))
+  dev.off()
   
   
+  png(filename = paste('2015 Occupancy.png'),
+      units="in", 
+      width=7, 
+      height=9, 
+      pointsize=12,res = 400)
   ggplot(data=subset(OccTable_daily_wDetections, Year==2015)) +
     theme_bw() +
     facet_wrap(~GroupId) +
@@ -1030,11 +1051,11 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     geom_line(data=subset(fit, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=subset(fit, Year==2015),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Classification Rates 2015')+
+    ggtitle('Daily Occupancy Rates 2015')+
     ylab('P(BND)') +
     theme(plot.title = element_text(hjust = 0.5))
     
-
+  dev.off()
 
 # Xi) Make partial plots for all groups as before ###########
   
