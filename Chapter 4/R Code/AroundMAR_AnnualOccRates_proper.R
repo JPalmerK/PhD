@@ -932,7 +932,8 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     geom_line(data=subset(fit, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
     geom_ribbon(data=fit,aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
                 alpha=.3,linetype= 'blank') +
-    ggtitle('Daily Occupancy ' )+
+    ggtitle('Daily Occupancy ' ) +
+    ylab('P(BND)')+
     theme(plot.title = element_text(hjust = 0.5))
   
   
