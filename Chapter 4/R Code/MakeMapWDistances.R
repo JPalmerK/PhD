@@ -210,7 +210,7 @@ for(ii in 1:length(unique(meta2$RiverName))){
 }
 
 # Calculate minimum distances 
-dat$DistToSalmonRun=apply(as.data.frame(dat@data[,6:11]), 1, FUN=min)
+dat$DistToSalmonRun=apply(as.data.frame(dat@data[,6:11]), 1, FUN=function(x){min(x, na.rm = TRUE)})
 dat$RiverName=apply(as.data.frame(dat@data[,6:11]), 1, 
                     FUN=function(x){colnames(dat@data)[6:11][which.min(x)]})
   
@@ -305,6 +305,7 @@ library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
 library(geosphere)  
 library(fields)
+library(marmap)
 
 
 # Calculate AUC, %0's id'ed and %1's ided, from Pirotta sperm whale paper- 
@@ -631,13 +632,13 @@ for(ii in 1:3){
   #dat1$Col <- rbPal(10)[as.numeric(cut(dat1$fit,breaks = 20))]
 
   dat1$Col <- heat.colors(20)[as.numeric(cut(dat1$fit,
-                                             breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+                                             breaks = as.numeric(quantile(unlist(preds), seq(0, 1, length.out = 20)))))]
 
   dat1$ColLCI <- heat.colors(20)[as.numeric(cut(dat1$LCI,
-                                             breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+                                             breaks = as.numeric(quantile(unlist(preds), seq(0, 1, length.out = 20)))))]
   
   dat1$ColUCI <- heat.colors(20)[as.numeric(cut(dat1$UCI,
-                                                breaks = as.numeric(quantile(unlist(preds), seq(.01, .99, length.out = 20)))))]
+                                                breaks = as.numeric(quantile(unlist(preds), seq(0, 1, length.out = 20)))))]
   
   dat1$Season=as.character(Preddat$Season)
 
@@ -662,8 +663,11 @@ for(ii in 1:3){
    #  fit
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
      bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
-                 c(min(NorthSea), 1, "darkblue", "lightblue")),
-     main= paste(Preddat$Season[1], 'fit'))
+                 c(min(NorthSea), 1, "lightsteelblue3", "lightsteelblue1")),
+     main= Preddat$Season[1], 
+    xlim=range(coordinates(NorthSea_raster)[,1]),
+    ylim=c(56 ,58))
+
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
@@ -675,14 +679,14 @@ for(ii in 1:3){
   #image.plot(legend.only = TRUE,zlim=range(unlist(preds)), col = heat.colors(20),)
 
   points(meta2,
-         pch = 18,
+         pch = 20, cex=.5,
          col = 'black')
 
   #  LCI
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
        bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
                    c(min(NorthSea), 1, "darkblue", "lightblue")),
-       main=paste(Preddat$Season[1], 'LCI'))
+       main=paste('LCI'))
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
@@ -691,14 +695,14 @@ for(ii in 1:3){
          col = dat1$ColLCI, main=Preddat$Season[1])
   
   points(meta2,
-         pch = 18,
+         pch = 20, cex=.5,
          col = 'black')
   
   # UCI
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
        bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
                    c(min(NorthSea), 1, "darkblue", "lightblue")),
-       main=paste(Preddat$Season[1], 'UCI'))
+       main=paste('UCI'))
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
@@ -707,10 +711,10 @@ for(ii in 1:3){
          col = dat1$ColUCI, main=Preddat$Season[1])
   
   points(meta2,
-         pch = 18,
+         pch = 20, cex=.5,
          col = 'black')
   
-  
+  mtext(text=Preddat$Season[1],side=3,line=0,outer=TRUE, cex=2)
   mtext(text="Longitude",side=1,line=0,outer=TRUE)
   mtext(text="Latitude",side=2,line=0,outer=TRUE)
   
@@ -727,8 +731,17 @@ for(ii in 1:3){
   }
 
 
+par(mfrow=c(2,3))
+# Model output
+png(filename = paste('Spatial Model1.png'),
+    units="in", 
+    width=9, 
+    height=7, 
+    pointsize=12,res = 400)
 
 
+plot(modlist_spatial[[10]]$gam, trans=inv.logit)
+dev.off()
 
 
 
