@@ -18,8 +18,8 @@ library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
 library(geosphere)       # for distance between lat long points, estimating distance between river and locs
-
-
+library(car)             # for big A anova (re Dr. Nora V Carlson )
+library(viridis)
 
 
 
@@ -72,7 +72,41 @@ CalcAUC<-function(mod, data_sub, BinaryResponse_var){
 
 
 
-
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
 
 # colorblind palette with black for plotting
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
@@ -198,6 +232,22 @@ OccTable$id3=id3
 OccTable$id4=id4
 
 
+# Create grouping factors for group + is cro
+OccTable$GroupIsCro=as.factor(paste(OccTable$GroupId, OccTable$IsCro))
+
+id1_cro=as.numeric(as.factor(OccTable$Date)) ## used to make id4 but not used in correlation
+id2_cro=as.numeric(as.factor(OccTable$UnitLoc)) ## used to make id4 but not used in correlation
+id3_cro=as.numeric(as.factor(OccTable$HourAfterPeakSolEle))
+id4_cro=as.numeric(paste(id1_cro, id2_cro, sep=""))  
+
+
+OccTable$id3_cro=id3_cro
+OccTable$id4_cro=id4_cro
+id4_cro[OccTable$UnitLoc=='Cro_05']=max(id4_cro)+as.numeric(id1_cro[OccTable$UnitLoc=='Cro_05'])  
+
+
+OccTable$id3_cro=id3_cro
+OccTable$id4_cro=id4_cro
 
 # Calculate hourly  detection rate
 
@@ -253,6 +303,7 @@ OccTable_Cro=droplevels(OccTable_Cro)
 OccTable$IsCro=as.factor(ifelse(OccTable$UnitLoc=='Cro_05', 'Cro_05', 'Other'))
 OccTable_NoCro=OccTable[OccTable$IsCro=='Other',]
 
+
 FullModel_NoCro=gamm(BNDTotOffset ~ShoreDist+GroupId+s(HourAfterHigh, bs='cc', k=10, by=GroupId) +
                  te(HourAfterPeakSolEle, scale(DistToSalmonRun), bs='cc', k=10, by=GroupId),
                correlation=corAR1(form= ~id3|id4),
@@ -286,7 +337,8 @@ FullModel_1=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+
                family=binomial,
                random=list(UnitLoc=~1))
 
-FullModel_2=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=ShoreDist)+ShoreDist,
+FullModel_2=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10) +
+                   s(HourAfterPeakSolEle, bs='cc', k=10, by=ShoreDist)+ShoreDist,
                  correlation=corAR1(form=~id3|id4),
                  data=OccTable_DPD_nocro,
                  family=binomial,
@@ -316,8 +368,41 @@ FullModel_6=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeak
                  family=binomial,
                  random=list(UnitLoc=~1))
 
+FullModel_12=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc', k=10, by=GroupId)+GroupId,
+                 correlation=corAR1(form=~id3|id4),
+                 data=OccTable_DPD_nocro,
+                 family=binomial,
+                 random=list(UnitLoc=~1))
 
-FullModel_11=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPeakSolEle, bs='cc', k=10, by=ShoreDist) + Depth_m +DistToSalmonRun,
+FullModel_13=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc', k=10),
+                  correlation=corAR1(form=~id3|id4),
+                  data=OccTable_DPD_nocro,
+                  family=binomial,
+                  random=list(UnitLoc=~1))
+
+FullModel_14=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc', k=10, by=GroupId)+GroupId,
+                  correlation=corAR1(form=~id3|id4),
+                  data=OccTable_DPD_nocro,
+                  family=binomial,
+                  random=list(UnitLoc=~1))
+
+FullModel_15=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ 
+                   s(HourAfterPeakSolEle, bs='cc', k=10),
+                 correlation=corAR1(form=~id3|id4),
+                 data=OccTable_DPD_nocro,
+                 family=binomial,
+                 random=list(UnitLoc=~1))
+
+FullModel_15=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(Depth_m)
+                    s(HourAfterPeakSolEle, bs='cc', k=10),
+                  correlation=corAR1(form=~id3|id4),
+                  data=OccTable_DPD_nocro,
+                  family=binomial,
+                  random=list(UnitLoc=~1))
+
+
+FullModel_11=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ 
+                    s(HourAfterPeakSolEle, bs='cc', k=10, by=ShoreDist) + Depth_m +DistToSalmonRun,
                  correlation=corAR1(form=~id3|id4),
                  data=OccTable_DPD_nocro,
                  family=binomial,
@@ -349,21 +434,41 @@ FullModel_10=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc' , k=10)+ s(HourAfterPea
 
 
 
+FullModel_12=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc',by=IsCro, k=10)+
+                    s(HourAfterPeakSolEle, bs='cc', k=10, by=IsCro),
+                  correlation=corAR1(form=~id3|id4),
+                  data=OccTable_DPD,
+                  family=binomial,
+                  random=list(UnitLoc=~1))
+
+
+FullModel_13=gamm(BNDTotOffset ~s(HourAfterHigh, bs='cc',by=GroupIsCro, k=3)+
+                    s(HourAfterPeakSolEle, bs='cc',by=GroupIsCro, k=3),
+                  correlation=corAR1(form=~id3_cro|id4_cro),
+                  data=OccTable_DPD,
+                  family=binomial,
+                  random=list(UnitLoc=~1))
+
+
+
+
 mm=data.frame(AIC( FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
                   FullModel_5, FullModel_6, FullModel_7, FullModel_9, 
-                  FullModel_10))
+                  FullModel_10, FullModel_11, FullModel_12, FullModel_13,
+                  FullModel_14, FullModel_15))
+
 mm=mm[order(mm$AIC),]
 
 modlist=list( FullModel_1, FullModel_2, FullModel_3, FullModel_4, 
               FullModel_5, FullModel_6, FullModel_7, FullModel_9, 
-              FullModel_10)
+              FullModel_10, )
 
 # Make Model Selection table
 modelselection=data.frame(Formula= unlist(lapply(modlist, FUN = function(x){Reduce(paste, deparse(formula(x)))})),
                           AIC=unlist(lapply(modlist, AIC)))
   
 modelselection$dAIC=modelselection$AIC-min(modelselection$AIC)
-  
+
 
 
 
@@ -398,6 +503,212 @@ for(ii in 1:10){
   rm(mod)
 }
 
+
+
+
+
+
+
+mod1=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc'),
+          correlation=corAR1(form=~id3|id4),
+          data=OccTable_DPD_nocro,
+          family=binomial,
+          random=list(UnitLoc=~1))
+
+
+mod2=gamm(BNDTotOffset ~ ShoreDist + s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc', by = ShoreDist) 
+          correlation=corAR1(form=~id3|id4),
+          data=OccTable_DPD_nocro,
+          family=binomial,
+          random=list(UnitLoc=~1))
+
+mod3=gamm(BNDTotOffset ~ GroupId + s(HourAfterPeakSolEle,  bs = 'cc',  by = GroupId) + s(HourAfterHigh,  bs = 'cc'),
+          correlation=corAR1(form=~id3|id4),
+          data=OccTable_DPD_nocro,
+          family=binomial,
+          random=list(UnitLoc=~1))
+
+mod4=gamm(BNDTotOffset ~ te(HourAfterPeakSolEle,  HourAfterHigh,  by=ShoreDist,  bs='cc'),
+          correlation=corAR1(form=~id3|id4),
+          data=OccTable_DPD_nocro,
+          family=binomial,
+          random=list(UnitLoc=~1))
+
+mod5=gamm(BNDTotOffset ~ ShoreDist + te(HourAfterPeakSolEle,  HourAfterHigh,  by=ShoreDist,  bs='cc'),
+          correlation=corAR1(form=~id3|id4),
+          data=OccTable_DPD_nocro,
+          family=binomial,
+          random=list(UnitLoc=~1))
+
+
+
+
+# Cromarty Subet Modelling#####################################################################################################
+
+OccTable_DPD_cro=OccTable_DPD[OccTable_DPD$UnitLoc =='Cro_05',]
+OccTable_DPD_cro=droplevels(OccTable_DPD_cro)
+
+# Correlation structure
+
+id1_cro=as.numeric(as.factor(OccTable_DPD_cro$Date)) ## used to make id4 but not used in correlation
+id3_cro=as.numeric(as.factor(OccTable_DPD_cro$HourAfterPeakSolEle))
+
+OccTable_DPD_cro$id1_cro=id1_cro
+OccTable_DPD_cro$id3_cro=id3_cro
+
+
+Cro_mod1=gamm(BNDTotOffset~s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc'),
+              correlation=corAR1(form=~id3_cro|id1_cro),
+              data=OccTable_DPD_cro,
+              family=binomial)
+
+Cro_mod2=gamm(BNDTotOffset ~  te(HourAfterPeakSolEle,  HourAfterHigh,  bs='cc'),
+              correlation=corAR1(form=~id3_cro|id1_cro),
+              data=OccTable_DPD_cro,
+              family=binomial)
+
+
+
+
+
+# 
+
+# Do some plotting ###############
+
+# Set up the predictions dataframe
+PredDat=expand.grid(GroupId=unique(OccTable$GroupId),
+                    ShoreDist=unique(OccTable$ShoreDist),
+                    HourAfterPeakSolEle=unique(OccTable$HourAfterPeakSolEle))
+
+PredDat$HourAfterHigh=median(OccTable$HourAfterHigh)
+PredDat$UnitLoc=paste(PredDat$GroupId, PredDat$ShoreDist, sep = '_')
+
+PredDat$UnitLoc=factor(PredDat$UnitLoc, levels=level_names_unit)
+
+# Add actual data
+Datapoints=aggregate(data=OccTable_DPD, BNDTotOffset ~ UnitLoc+HourAfterPeakSolEle, FUN=mean)
+# Merge with prediction data
+PredDat=merge(Datapoints, PredDat, all.y=TRUE, by=c('UnitLoc','HourAfterPeakSolEle'))
+
+
+PredDat_nocro=subset(PredDat, UnitLoc != 'Cro_05')
+PredDat_cro=subset(PredDat, UnitLoc == 'Cro_05')
+
+
+# Non-cromarty predictions
+NoCroFit=as.data.frame(predict(mod3, PredDat_nocro, se.fit=TRUE))
+PredDat_nocro$fit=inv.logit(NoCroFit$fit)
+PredDat_nocro$UCI=inv.logit(NoCroFit$fit+(1.96*NoCroFit$se.fit))
+PredDat_nocro$LCI=inv.logit(NoCroFit$fit-(1.96*NoCroFit$se.fit))
+
+# Cromarty predictions
+CroFit=as.data.frame(predict(Cro_mod2, PredDat_cro, se.fit=TRUE))
+PredDat_cro$fit=inv.logit(CroFit$fit)
+PredDat_cro$UCI=inv.logit(CroFit$fit+(1.96*CroFit$se.fit))
+PredDat_cro$LCI=inv.logit(CroFit$fit-(1.96*CroFit$se.fit))
+
+# FUUUUUUUUUUUUUUZE them. Yes, that's an Invader Zim reference.
+
+
+
+
+# Create figure of predictions and data
+png(filename = paste('HourlyDet.png'),
+    units="in",
+    width=7,
+    height=9,
+    pointsize=12,res = 400)
+
+ggplot(PredDat_nocro) +
+  facet_wrap(~GroupId) +
+  geom_point(aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist), size=.5)+
+  geom_line(aes(HourAfterPeakSolEle, fit)) +
+  geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.3,linetype= 'blank') +
+  geom_point(data=PredDat_cro,aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist), size=.5)+
+  geom_line(data=PredDat_cro,aes(HourAfterPeakSolEle, fit)) +
+  geom_ribbon(data=PredDat_cro,aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.3,linetype= 'blank')+
+  theme_bw() +
+  ylim(c(0,.2)) +
+  scale_colour_manual(values=cbbPalette) +
+  ggtitle('Hourly Detection Rate') + 
+  xlab('Hour Relative to Solar Noon') +
+  ylab('Broadband Clcik Train Encounter Rate') +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+dev.off()
+
+# Figure for Cromarty Model time and Tide #####
+
+Cro_Model_data=expand.grid(HourAfterPeakSolEle=unique(OccTable$HourAfterPeakSolEle),
+                      HourAfterHigh=unique(OccTable$HourAfterHigh))
+Cro_Model_data$UnitLoc='Cro_05'
+Cro_Model_data$BNDTotOffset=0
+
+Cro_Model_fit=predict(Cro_mod2, Cro_Model_data, se.fit=TRUE)
+Cro_Model_data$fit=inv.logit(Cro_Model_fit$fit)
+Cro_Model_data$LCI=inv.logit(Cro_Model_fit$fit-(1.96*Cro_Model_fit$se.fit))
+Cro_Model_data$UCI=inv.logit(Cro_Model_fit$fit+(1.96*Cro_Model_fit$se.fit))
+
+
+
+
+# Create figure of predictions and data
+png(filename = paste('CromartyModel.png'),
+    units="in",
+    width=10,
+    height=9,
+    pointsize=12,res = 400)
+
+p1<-ggplot(data=Cro_Model_data, aes(HourAfterPeakSolEle, HourAfterHigh))+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))  +
+  ggtitle('Model Fit') +
+  geom_tile(aes(fill = fit)) +
+  #scale_fill_distiller(palette = "Spectral") +
+  scale_fill_viridis(option ='inferno') +
+  ylab('Hour Relative to Hight Tide') +
+  xlab('') +
+  geom_point(data=subset(OccTable_DPD_cro,BNDTotOffset>0) ,
+             aes(HourAfterPeakSolEle, HourAfterHigh, color=BNDTotOffset)) +
+   #theme(legend.position='none') +
+  scale_color_continuous(low = 'black', high = 'white') +
+  guides(color = FALSE, fill=FALSE, size = FALSE)
+
+p3<-ggplot(data=Cro_Model_data, aes(HourAfterPeakSolEle, HourAfterHigh))+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))  +
+  ggtitle('Model Upper 95% Confidence Interval') +
+  geom_tile(aes(fill = UCI)) +
+  #scale_fill_distiller(palette = "Spectral") +
+  scale_fill_viridis(option ='inferno') +
+  ylab('') +
+  xlab('') +
+  geom_point(data=subset(OccTable_DPD_cro,BNDTotOffset>0) ,
+             aes(HourAfterPeakSolEle, HourAfterHigh, color=BNDTotOffset)) +
+  #theme(legend.position='none') +
+  scale_color_continuous(low = 'black', high = 'white') +
+  guides(color = FALSE, fill=FALSE, size = FALSE)
+
+
+p2<-ggplot(data=Cro_Model_data, aes(HourAfterPeakSolEle, HourAfterHigh))+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))  +
+  ggtitle('Model Lower 95%  Confidence Interval') +
+  geom_tile(aes(fill = UCI)) +
+  #scale_fill_distiller(palette = "Spectral") +
+  scale_fill_viridis(option ='inferno') +
+  ylab('Hour Relative to Hight Tide') +
+  xlab('Hour Relative to Solar Noon') +
+  geom_point(data=subset(OccTable_DPD_cro,BNDTotOffset>0) ,
+             aes(HourAfterPeakSolEle, HourAfterHigh, color=BNDTotOffset)) +
+  #theme(legend.position='none') +
+  scale_color_continuous(low = 'black', high = 'white') +
+  guides(color = FALSE, size = FALSE)
+
+  
+ multiplot(p1, p2, p3,cols = 2)
+
+dev.off()
 
 
 
