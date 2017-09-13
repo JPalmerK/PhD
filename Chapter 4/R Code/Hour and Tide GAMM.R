@@ -511,7 +511,7 @@ for(ii in 1:10){
 
 mod1=gamm(BNDTotOffset ~ s(HourAfterPeakSolEle, bs='cc') + s(HourAfterHigh,  bs='cc'),
           correlation=corAR1(form=~id3|id4),
-          data=OccTable_DPD_nocro,
+          data=OccTable_DPDtem_nocro,
           family=binomial,
           random=list(UnitLoc=~1))
 
