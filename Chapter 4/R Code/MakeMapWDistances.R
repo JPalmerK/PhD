@@ -96,11 +96,53 @@ level_names=c( "Lat_05", "Lat_10", "Lat_15",
 
 
 
-
+# Read in meta data
 meta2=read.csv('W:\\KJP PHD\\Deployment Information\\SlopeAndAspect.csv')
 meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
 meta2$DistToSalmonRun=0
 meta2$RiverName='blarg'
+
+# Make fake meta2 for recomendations
+meta2_temp=data.frame(Lat=numeric(length = 8),
+                      Lon=numeric(length = 8))
+meta2_temp$UnitLoc=as.factor(c('New_05', 'Bor_05','Mac_05',
+                                                    'Pet_05', 'Bla_05', 'Ivb_05',
+                                                    'Leu_05', 'Man_05'))
+
+meta2_temp$UnitLoc[1]='New_05' #Newport
+meta2_temp$Lat[1]=58.19
+meta2_temp$Lon[1]=-3.448
+
+meta2_temp$UnitLoc[2]='Bor_05'#Brora
+meta2_temp$Lat[2]=  57.933
+meta2_temp$Lon[2]= -3.66
+
+meta2_temp$UnitLoc[3]='Mac_05'#Macduff
+meta2_temp$Lat[3]=  57.70
+meta2_temp$Lon[3]= -2.51
+
+meta2_temp$UnitLoc[4]='Pet_05'#Peterhead
+meta2_temp$Lat[4]= 57.59
+meta2_temp$Lon[4]= -1.68
+
+meta2_temp$UnitLoc[5]='Bla_05'#BlackDog
+meta2_temp$Lat[5]=  57.234
+meta2_temp$Lon[5]=  -1.962
+
+meta2_temp$UnitLoc[6]='Ivb_05'#Inverbervie
+meta2_temp$Lat[6]=   56.764
+meta2_temp$Lon[6]=   -2.28
+
+
+meta2_temp$UnitLoc[7]='Leu_05'#Leuchars
+meta2_temp$Lat[7]=    56.3933
+meta2_temp$Lon[7]=    -2.73774
+
+
+meta2_temp$UnitLoc[8]='Man_05'#Mann
+meta2_temp$Lat[8]=    56.086
+meta2_temp$Lon[8]=     -2.44920
+
 
 #river_coords=river_locs[, c('lonDeg','LatDeg' )]
 coordinates(river_locs)=c('lonDeg','LatDeg' )
@@ -112,7 +154,8 @@ summary(river_locs)
 coordinates(meta2)=meta2[,c('Lon','Lat' )]
 proj4string(meta2) <- crs.geo  # define projection system of our data
 
-
+coordinates(meta2_temp)=meta2_temp[,c('Lon', 'Lat')]
+proj4string(meta2_temp) <- crs.geo  # define projection system of our data
 
 
 # Load bathymetry (MarMap)
@@ -135,8 +178,13 @@ points(river_locs, pch = 21, col = "black",
 points(meta2, pch = 21, col = "black",
        bg = "red", cex = 1.3)
 
+points(meta2_temp, pch = 21, fill = "black",
+       bg = "green", cex = 1.3)
+
+
+
 # Create a raster version
-NorthSea_raster=as.raster(NorthSea)
+NorthSea_raster=marmap::as.raster(NorthSea)
 NorthSea_raster=projectRaster(NorthSea_raster, crs = crs.geo)
 NorSea_spatialGrid=as.SpatialGridDataFrame(bathy = NorthSea)
 
@@ -146,8 +194,11 @@ Slope=terrain(NorthSea_raster, opt = 'Slope', unit = 'Radians', neighbors = 4)
 
 
 # Distance to Shore
-
 meta2$DistToShore=dist2isobath(NorthSea, coordinates(meta2), isobath = 0)$distance
+meta2_temp$DistToShore=dist2isobath(NorthSea, coordinates(meta2_temp), isobath = 0)$distance
+
+
+
 
 # calculate distance to nearest salmon river
 for(ii in 1:30){
@@ -159,8 +210,24 @@ for(ii in 1:30){
                     fun = distHaversine)
   }
   
+  
   meta2$DistToSalmonRun[ii]=min(temp)
   meta2$RiverName[ii]=as.character(river_locs$Rivername[which.min(temp)])
+  
+  
+  if(ii<9){
+    for(jj in 1:length(river_locs)){
+      temp[jj]=distm (coordinates(meta2_temp)[ii,], 
+                      coordinates(river_locs)[jj,], 
+                      fun = distHaversine)
+    }
+    
+    
+    meta2_temp$DistToSalmonRun[ii]=min(temp)
+    meta2_temp$RiverName[ii]=as.character(river_locs$Rivername[which.min(temp)])
+    
+  }
+  
   
 }
 
@@ -187,7 +254,7 @@ plot(NorthSea, n = 0, lwd = 0.5, image=TRUE,
 
 # Get depth
 dat$Depth=get.depth(NorthSea, cbind(dat$Lon, dat$Lat), locator = FALSE)
-
+meta2_temp$Depth_m=get.depth(NorthSea,x = cbind(meta2_temp$Lon, meta2_temp$Lat), locator=FALSE)[,3]
 
 # Filter datapoints where depth is less than 1 meter of water
 dat <- dat[dat@data$Depth.depth < 1,]
@@ -198,6 +265,8 @@ dat$DistToShore= dist2isobath(NorthSea, dat$Depth.lon , dat$Depth.lat, isobath=0
 # Get slope values
 dat$Slope=raster::extract(Slope, dat)
 meta2$SlopeMap=raster::extract(Slope, meta2)
+meta2_temp$SlopeMap=raster::extract(Slope, meta2_temp)
+
 
 
 # Calculate distance between features and all data
@@ -286,7 +355,7 @@ points(dat[!is.na(dat$`Cromarty Firth`),], pch = 21, col = "Green",
 # Clear out some crap 
 
 rm(list=setdiff(ls(), c("dat", 'NorthSea', 'NorthSea_raster',
-                        'proj_UTM', 'crs.geo', 'meta2', 'level_names')))
+                        'proj_UTM', 'crs.geo', 'meta2', 'meta2_temp','level_names')))
 
 
 library(boot)            # for inv.logit
@@ -375,6 +444,9 @@ OccTable= read.csv('W:/KJP PHD/4-Bayesian Habitat Use/R Code/OccupancyTable_Thre
 meta=read.csv('W:/KJP PHD/Deployment Information/CPODs for Kaitlin.csv')
 
 meta2=merge(meta2, distinct(meta[, c('UnitLoc', 'Depth_m')]), by='UnitLoc',all.x=TRUE)
+meta2$UnitLoc=factor(meta2$UnitLoc, levels=level_names)
+
+
 
 OccTable$UnitLoc=factor(OccTable$UnitLoc, levels=level_names)
 OccTable$DateUnitloc=as.factor(paste(OccTable$Date, OccTable$UnitLoc))
@@ -499,116 +571,260 @@ cor(meta2$SlopeMap, meta2$DistToShore, method='pearson')
 
 # All highly fucking correlated! 
 
-modlist_spatial=list()
+
+# Use PCA make new composite variable
+pcadata=as.data.frame(meta2[,c('DistToSalmonRun',  'SlopeMap', 'DistToShore', 'Depth_m')])[,1:4]
+# scale PCA data
+pcadata=apply(pcadata, 2, scale)
+PCAmod=princomp(pcadata)
+summary(PCAmod)
+#93% of the variation accounted for by the first component of the PCA
 
 
-modlist_spatial[[1]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3),
+# Create a new column for the dat representing the conglomeration of the variables
+newdata=data.frame(dat@data)
+colnames(newdata)[5]='SlopeMap'
+colnames(newdata)[3]='Depth_m'
+
+# Create new variable for the map and for the Occupancy table
+newdaa=newdata[,c('DistToSalmonRun',  'SlopeMap', 'DistToShore', 'Depth_m')]
+dat$PCAcomp=predict(PCAmod, newdata=newdaa)[,3]
+
+newdaa=OccTable_daily[,c('DistToSalmonRun',  'SlopeMap', 'DistToShore', 'Depth_m')]
+OccTable_daily$PCAcomp=predict(PCAmod, newdata=newdaa)[,1]
+
+
+
+# New variable for the model
+meta2$PCA_predict=predict(PCAmod)[,1]
+
+
+
+# Spatial Model
+modlist_spatial= gamm(BNDTotOffset~s(PCAcomp, bs='ts'),
                            correlation=corAR1(form = ~1|dateunit),
                            family=binomial,
-                           data=OccTable_daily)
+                           data=OccTable_daily, fx=TRUE ) #54655.14
 
-modlist_spatial[[2]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
+modlist_spatial_season= gamm(BNDTotOffset~s(PCAcomp, k = 3, bs='ts', by=Season)+Season,
+                      correlation=corAR1(form = ~1|dateunit),
+                      family=binomial,
+                      data=OccTable_daily, fx=TRUE ) #55375.22
 
-modlist_spatial[[3]]= gamm(BNDTotOffset~s(DistToShore, bs='ts', k=3),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
+modlist_spatial_jdate= gamm(BNDTotOffset~s(PCAcomp, bs='ts', k=3)+s(JulienDay, k=2),
+                             correlation=corAR1(form = ~1|dateunit),
+                             family=binomial,
+                             data=OccTable_daily, fx=TRUE ) # 
 
-modlist_spatial[[4]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
-
-
-modlist_spatial[[5]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
-
-
-modlist_spatial[[6]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3)+s(SlopeMap, bs='ts', k=3),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
-
-
-modlist_spatial[[7]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=RiverName),
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
-
-
-modlist_spatial[[8]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3) + Season,
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily)
-
-modlist_spatial[[9]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3) + 
-                             s(SlopeMap, bs='ts', k=3) + Season,
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily,
-                           random=list(UnitLoc=~1))
-
-
-modlist_spatial[[10]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
-                            +s(SlopeMap, bs='ts', k=3, by=Season) + Season,
-                           correlation=corAR1(form = ~1|dateunit),
-                           family=binomial,
-                           data=OccTable_daily,
-                           random=list(UnitLoc=~1))
-
-modlist_spatial[[11]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+
-                              s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+modlist_spatial_jdate_te= gamm(BNDTotOffset~te(PCAcomp,JulienDay, bs='ts', k=4),
                             correlation=corAR1(form = ~1|dateunit),
                             family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
+                            data=OccTable_daily, fx=TRUE ) #
 
-modlist_spatial[[12]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season) + Season,
-                            correlation=corAR1(form = ~1|dateunit),
-                            family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
-
-modlist_spatial[[13]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
-                            +s(DistToShore, bs='ts', k=3, by=Season) + Season,
-                            correlation=corAR1(form = ~1|dateunit),
-                            family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
-
-modlist_spatial[[14]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3)
-                            +s(DistToShore, bs='ts', k=3, by=Season) + Season,
-                            correlation=corAR1(form = ~1|dateunit),
-                            family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
+modlist_spatial_jdate_te= gamm(BNDTotOffset~te(PCAcomp,JulienDay, bs='ts', k=4),
+                               correlation=corAR1(form = ~1|dateunit),
+                               family=binomial,
+                               data=OccTable_daily, fx=TRUE ) # 
 
 
-modlist_spatial[[15]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
-                            + s(DistToShore, bs='ts', k=3) + Season,
-                            correlation=corAR1(form = ~1|dateunit),
-                            family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
+modlist_spatial_jdate_te_wrandom= gamm(BNDTotOffset~te(PCAcomp,JulienDay, bs='ts', k=4),
+                               correlation=corAR1(form = ~1|dateunit),
+                               family=binomial,
+                               random=list(UnitLoc=~1),
+                               data=OccTable_daily, fx=TRUE ) #
 
-modlist_spatial[[16]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
-                            + s(DistToShore, bs='ts', k=3) + Season,
-                            correlation=corAR1(form = ~1|UnitLoc),
-                            family=binomial,
-                            data=OccTable_daily,
-                            random=list(UnitLoc=~1))
+
+
+modlist_spatial_jdate_te_nocro= gamm(BNDTotOffset~te(PCAcomp,JulienDay, bs='ts', k=4),
+                               correlation=corAR1(form = ~1|dateunit),
+                               family=binomial,
+                               data=subset(OccTable_daily, UnitLoc !='Cro_05'), fx=TRUE ) #54012.59 
+
+
+modlist_spatial_jdate_rivername= gamm(BNDTotOffset~s(PCAcomp, k=3, by=RiverName) +RiverName ,
+                                      correlation=corAR1(form = ~1|dateunit),
+                                      family=binomial,
+                                      data=OccTable_daily, fx=TRUE ) # 55302.02
+
+OccTable_daily_nocro=subset(OccTable_daily, UnitLoc != 'Cro_05')= gamm(BNDTotOffset~s(PCAcomp, k=3, by=RiverName) +RiverName ,
+                               correlation=corAR1(form = ~1|dateunit),
+                               family=binomial,
+                               data=OccTable_daily, fx=TRUE ) # 55302.02
+
+OccTable_daily_nocro=subset(OccTable_daily, UnitLoc != 'Cro_05')
+
+
+# Ideal Model
+ModelFull= gamm(BNDTotOffset~s(JulienDay, k=3, by=RiverName) +RiverName 
+                + s(DistToSalmonRun, bs='ts', by=RiverName)+s(Depth_m, bs='ts') +
+                  s(DistToShore, bs='ts')+
+                  s(SlopeMap, bs='ts')+Year,
+                random=list(UnitLoc=~1),
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily, fx=TRUE ) 
+
+# Remove one interaction
+ModelFull= gamm(BNDTotOffset~s(JulienDay, k=3, by=RiverName) +RiverName 
+                + s(DistToSalmonRun, bs='ts')+s(Depth_m, bs='ts') +
+                  s(DistToShore, bs='ts')+
+                  s(SlopeMap, bs='ts')+Year,
+                random=list(UnitLoc=~1),
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily, fx=TRUE ) 
+
+# Remove other interaction
+ModelFull= gamm(BNDTotOffset~ #s(JulienDay, k=3, bs='ts') +
+                  s(SlopeMap, bs='ts')+
+                  s(DistToSalmonRun, bs='ts', k=3) +
+                  s(Depth_m, bs='ts') +
+                  s(DistToShore, bs='ts') +
+                  RiverName + Season,
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily, Select=TRUE ) 
+
+FinalModel=gamm(BNDTotOffset~ #s(JulienDay, k=3, bs='ts') +
+                  #s(SlopeMap, bs='ts')+
+                  s(DistToSalmonRun, bs='ts', k=3) +
+                  s(Depth_m, bs='ts') +
+                  s(DistToShore, bs='ts') +
+                  RiverName + Season,
+                correlation=corAR1(form = ~1|dateunit),
+                family=binomial,
+                data=OccTable_daily, Select=TRUE ) 
+
+
+
+# Check for co
+
+# Run VIF score
+vifmodel=glm(BNDTotOffset~SlopeMap + Depth_m + DistToSalmonRun +DistToShore,
+             family=binomial,
+             data=OccTable_daily)
+
+
+library(car)
+
+vif(vifmodel)
+
+# vif suggests colinearity not as big of an issue as thought
+
+
+
+# 
+# modlist_spatial=list()
+# 
+# 
+# modlist_spatial[[1]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# modlist_spatial[[2]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# modlist_spatial[[3]]= gamm(BNDTotOffset~s(DistToShore, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# modlist_spatial[[4]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# 
+# modlist_spatial[[5]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# 
+# modlist_spatial[[6]]= gamm(BNDTotOffset~s(Depth_m, bs='ts', k=3)+s(SlopeMap, bs='ts', k=3),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# 
+# modlist_spatial[[7]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=RiverName),
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# 
+# modlist_spatial[[8]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+s(Depth_m, bs='ts', k=3) + Season,
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily)
+# 
+# modlist_spatial[[9]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3) + 
+#                              s(SlopeMap, bs='ts', k=3) + Season,
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily,
+#                            random=list(UnitLoc=~1))
+# 
+# 
+# modlist_spatial[[10]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
+#                             +s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+#                            correlation=corAR1(form = ~1|dateunit),
+#                            family=binomial,
+#                            data=OccTable_daily,
+#                            random=list(UnitLoc=~1))
+# 
+# modlist_spatial[[11]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3)+
+#                               s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+#                             correlation=corAR1(form = ~1|dateunit),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
+# 
+# modlist_spatial[[12]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season) + Season,
+#                             correlation=corAR1(form = ~1|dateunit),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
+# 
+# modlist_spatial[[13]]= gamm(BNDTotOffset~s(DistToSalmonRun, bs='ts', k=3, by=Season)
+#                             +s(DistToShore, bs='ts', k=3, by=Season) + Season,
+#                             correlation=corAR1(form = ~1|dateunit),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
+# 
+# modlist_spatial[[14]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3)
+#                             +s(DistToShore, bs='ts', k=3, by=Season) + Season,
+#                             correlation=corAR1(form = ~1|dateunit),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
+# 
+# 
+# modlist_spatial[[15]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
+#                             + s(DistToShore, bs='ts', k=3) + Season,
+#                             correlation=corAR1(form = ~1|dateunit),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
+# 
+# modlist_spatial[[16]]= gamm(BNDTotOffset~s(SlopeMap, bs='ts', k=3, by=Season)
+#                             + s(DistToShore, bs='ts', k=3) + Season,
+#                             correlation=corAR1(form = ~1|UnitLoc),
+#                             family=binomial,
+#                             data=OccTable_daily,
+#                             random=list(UnitLoc=~1))
 
 
 lapply(modlist_spatial, AIC)
 
-
+jdayval=c(150, 212, 275)
 #just use model 10
 
+op<-par(no.readonly=TRUE)
 for(ii in 1:3){
   
   # Filter by distance
@@ -618,12 +834,22 @@ for(ii in 1:3){
                      DistToSalmonRun=dat1$DistToSalmonRun,
                      BNDTotOffset=rep(0, nrow(dat1)),
                      DistToShore=dat1$DistToShore,
-                     Season= unique(OccTable_daily$Season)[ii])
+                     Season= unique(OccTable_daily$Season)[ii],
+                     JulienDay=jdayval[ii],
+                     RiverName=dat1$RiverName,
+                     Year=2013)
+
+  # Pca combined model
+  Preddat$PCAcomp=predict(PCAmod, Preddat[,c('DistToSalmonRun',  'SlopeMap', 'DistToShore', 'Depth_m')])[,1]
   
-  preds=predict(modlist_spatial[[10]], Preddat, se.fit=TRUE)
+  
+  
+  preds=predict(FinalModel, Preddat, se.fit=TRUE)
+  #preds=predict(modlist_spatial[[10]], Preddat, se.fit=TRUE)
   preds$UCI=preds$fit+(1.96*preds$se.fit)
   preds$LCI=preds$fit-(1.96*preds$se.fit)
   
+  # Put on the binary scale
   preds[]<-lapply(preds, inv.logit)
 
   dat1=cbind(dat1, preds)
@@ -654,39 +880,40 @@ for(ii in 1:3){
        height=9, 
        pointsize=12,res = 400)
   
- 
-  
-  op<-par(no.readonly=TRUE)
-  par(op)
-  par(oma=c(2,2,0,4),mar=c(3,3,2,1),mfrow=c(2,2),pch=16)
-  
+
+  # par(oma=c(0,0,0,0),mar=c(3,3,5.2,0),mfrow=c(2,2),pch=16)
+   par(op)
+   par(oma=c(1,2,4,1),mar=c(3,3,7,0),mfrow=c(2,2),pch=16)
+
    #  fit
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
-     bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
-                 c(min(NorthSea), 1, "lightsteelblue3", "lightsteelblue1")),
-     main= Preddat$Season[1], 
-    xlim=range(coordinates(NorthSea_raster)[,1]),
-    ylim=c(56 ,58))
-
+       bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
+                   c(min(NorthSea), 1, "lightsteelblue3", "lightsteelblue1")),
+       main= 'Fit', 
+       xlim=range(coordinates(NorthSea_raster)[,1]),
+       ylim=c(56 ,58),  xaxs="i", yaxs="i", frame.plot = FALSE)
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
   points(x = dat1$Depth.lon, y=dat1$Depth.lat,
-       pch = 15, cex=.18,
+       pch = 15, cex=.5,
        col = dat1$Col, main=Preddat$Season[1])
-  #points(river_locs, pch=18, col='blue')
+  points(river_locs, pch=19, col='blue')
   
   #image.plot(legend.only = TRUE,zlim=range(unlist(preds)), col = heat.colors(20),)
 
   points(meta2,
          pch = 20, cex=.5,
          col = 'black')
+  #text(river_locs, river_locs$Rivername)
 
   #  LCI
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
        bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
-                   c(min(NorthSea), 1, "darkblue", "lightblue")),
-       main=paste('LCI'))
+                   c(min(NorthSea), 1, "lightsteelblue3", "lightsteelblue1")),
+       main= 'Lower 95% CI', 
+       xlim=range(coordinates(NorthSea_raster)[,1]),
+       ylim=c(56 ,58),  xaxs="i", yaxs="i", frame.plot = FALSE)
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
@@ -697,12 +924,15 @@ for(ii in 1:3){
   points(meta2,
          pch = 20, cex=.5,
          col = 'black')
+  points(river_locs, pch=19, col='blue')
   
   # UCI
   plot(NorthSea, n = 0, lwd = 0.5, image=TRUE, 
        bpal = list(c(0, 10, grey(.7), grey(.9), grey(.95)),
-                   c(min(NorthSea), 1, "darkblue", "lightblue")),
-       main=paste('UCI'))
+                   c(min(NorthSea), 1, "lightsteelblue3", "lightsteelblue1")),
+       main= 'Upper 95% CI',
+       xlim=range(coordinates(NorthSea_raster)[,1]),
+       ylim=c(56 ,58),  xaxs="i", yaxs="i", frame.plot = FALSE)
   
   scaleBathy(NorthSea, deg=1, x="bottomleft", y=NULL, inset=10, angle=90)
   
@@ -713,14 +943,19 @@ for(ii in 1:3){
   points(meta2,
          pch = 20, cex=.5,
          col = 'black')
+  points(river_locs, pch=19, col='blue')
   
-  mtext(text=Preddat$Season[1],side=3,line=0,outer=TRUE, cex=2)
+  # Plot titel if using Season
+  # mtext(text=Preddat$Season[1],side=3,line=0,outer=TRUE, cex=2)
+  
+  # Plto title otherwise
+  mtext(text= 'Daily Occupancy Probability',side=3,line=0,outer=TRUE, cex=2)
   mtext(text="Longitude",side=1,line=0,outer=TRUE)
   mtext(text="Latitude",side=2,line=0,outer=TRUE)
   
   image.plot(legend.only = TRUE,zlim=range(unlist(preds)), 
-             col = heat.colors(20), legend.mar = 0, legend.shrink = .8, 
-             legend.width = 1.2)
+             col = heat.colors(20), legend.mar = 0, legend.shrink = .5, 
+             legend.width = 1)
  
   
   
@@ -729,6 +964,39 @@ for(ii in 1:3){
   
   
   }
+
+
+
+# Make Partial models
+PmodelFull= gamm(BNDTotOffset~s(SlopeMap, k=3, bs='ts') + s(Depth_m, bs='ts', k=3) +
+                   s(DistToSalmonRun,bs='ts', k=3) + s(DistToShore, bs='ts', k=3),
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, niterPQL = 400) #
+
+PmodelSlope= gamm(BNDTotOffset~s(SlopeMap, k=3, bs='ts') ,
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, niterPQL = 400) #
+
+PmodelDepth= gamm(BNDTotOffset~ s(Depth_m, bs='ts', k=3),
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, niterPQL = 400) #
+
+PmodelDisttoSalmon= gamm(BNDTotOffset~s(DistToSalmonRun,bs='ts', k=3),
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, niterPQL = 400) #
+
+PmodelDisttoShore= gamm(BNDTotOffset~ s(DistToShore, bs='ts', k=3),
+                 correlation=corAR1(form = ~1|dateunit),
+                 family=binomial,
+                 data=OccTable_daily, niterPQL = 400) #
+
+
+
+
 
 
 par(mfrow=c(2,3))
@@ -807,3 +1075,26 @@ plot(NorthSea,
 
 
 for(ii in 1:30){plot(spTransform(SpatialCircle(sp = spTransform(meta2[ii,], proj_UTM), r=2000), crs.geo), add=TRUE)}
+
+
+
+
+
+# Try adding in the hypothetical locations
+# Create a new dataframe to test autocorrelation of when 8 more deployments added
+library(plyr)
+meta2_newarray=rbind.fill(as.data.frame(meta2), as.data.frame(meta2_temp))
+detach("package:plyr", unload=TRUE)
+
+cor(meta2_newarray$Depth_m, meta2_newarray$DistToSalmonRun, method='pearson') # correlation -0.4
+cor(meta2_newarray$Depth_m, meta2_newarray$SlopeMap, method='pearson') 
+cor(meta2_newarray$Depth_m, meta2_newarray$DistToShore, method='pearson') 
+
+cor(meta2_newarray$DistToSalmonRun, meta2_newarray$SlopeMap, method='pearson') 
+cor(meta2_newarray$DistToSalmonRun, meta2_newarray$DistToShore, method='pearson') 
+
+cor(meta2_newarray$SlopeMap, meta2_newarray$DistToShore, method='pearson') 
+
+
+
+

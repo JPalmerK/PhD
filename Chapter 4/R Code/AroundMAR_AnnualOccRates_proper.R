@@ -25,7 +25,7 @@ library(MASS)            # for mvrnorm in boostrapping intervals
 library(ROCR)            # to build the ROC curve
 library(PresenceAbsence) # to build the confusion matrix
 library(mvtnorm)         # for rmvnorm used in predictions/plotting
-
+source(paste(getwd(), 'predictvcv.R', sep = '/')) # load predict vcv from Mick
 
 river_locs=data.frame(Rivername=c("Esk", "Dee", "South Esk", "Spey", "Tay", "Thurso", "Tweed"),
                  Lat=c("555638", "570723", "564259", "574014", "562243", "583536", "554512"),
@@ -698,7 +698,7 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
 
 
 
-# X) Fit models to each deployment gorups, as before (make sure to load predictvcv first!) #######################################
+# X) Fit models to each deployment gorups, as before  #######################################
 
   # list to store the models #
   modlist=list()
@@ -1058,6 +1058,513 @@ ggplot(acf_val, aes(x=lag, y=acf_score)) +
     
   dev.off()
 
+  
+  
+  
+  
+  
+  
+###############################################################################
+# Run this stuff for Frequency banded Occ
+#################################################################################  
+
+  # 2)  Data Prep ####
+  
+  OccTable_daily$SpeciesOffsetfb=OccTable_daily$BBOcc+OccTable_daily$FBOcc+OccTable_daily$UNKOcc
+
+  # Species offset for Daily Occupancy
+  # If two species same day and same unit then uncertain
+  OccTable_daily$SpeciesOffsetfb[OccTable_daily$SpeciesOffsetfb>1]=0.5
+  OccTable_daily$SpeciesOffsetfb[OccTable_daily$SpeciesOffsetfb==1 & OccTable_daily$BBOcc==1]=0.03
+  OccTable_daily$SpeciesOffsetfb[OccTable_daily$SpeciesOffsetfb==1 & OccTable_daily$FBOcc==1]=0.57
+  OccTable_daily$SpeciesOffsetfb[OccTable_daily$SpeciesOffsetfb==1 & OccTable_daily$UNKOcc==1]=0.5
+  #OccTable_daily$SpeciesOffset[OccTable_daily$SpeciesOffset==0] = .01
+  
+  
+  
+  # Total offset
+  OccTable_daily$FBTotOffset=(OccTable_daily$BBTot*.03+OccTable_daily$FBTot*.57+OccTable_daily$UNKTot*.5)/
+    (OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
+  OccTable_daily$TotDet=(OccTable_daily$BBTot+OccTable_daily$FBTot+OccTable_daily$UNKTot)
+  OccTable_daily$FBTotOffset[is.na(OccTable_daily$BNDTotOffset)]=0
+  OccTable_daily$dateunit=as.factor(paste(OccTable_daily$Date, OccTable_daily$UnitLoc))
+  OccTable_daily$ScaleJd=scale(OccTable_daily$JulienDay)
+
+  OccTable_daily$FBTotOffset[is.nan(OccTable_daily$FBTotOffset)]=0
+  
+  
+  
+  OccTable_daily$YrUnitLoc=paste(OccTable_daily$UnitLoc, OccTable_daily$Year, sep='')
+  
+  OccTable_daily_wDetections= OccTable_daily[OccTable_daily$YrUnitLoc %in%
+                                               names(which(tapply(OccTable_daily$OccAll,OccTable_daily$YrUnitLoc,sum)>2)),]
+  OccTable_daily_wDetections=droplevels(OccTable_daily_wDetections)
+  
+  
+  
+  
+  
+  # 3)  Data Exploration/Viz ################################################################################
+
+# Much of this was done elsewhere, cursory exploration of colinearity between deployment distance from
+# shore factor(ShoreDist) and the slope of the bathymetry. 
+
+# Bin the data for visualisation #
+OccTable_daily$DayBin=cut(OccTable_daily$JulienDay, breaks=20)
+
+
+mm=data.frame(aggregate(data=OccTable_daily, FBOcc~DayBin+GroupId+ShoreDist, FUN=mean))
+mm=cbind(mm, aggregate(data=OccTable_daily, JulienDay~DayBin+GroupId+ShoreDist, FUN=median)[,4])
+mm=cbind(mm, aggregate(data=OccTable_daily, FBOcc~DayBin+GroupId+ShoreDist, FUN=sum)[,4])
+mm=cbind(mm, aggregate(data=OccTable_daily, FBOcc~DayBin+GroupId+ShoreDist, FUN=length)[,4])
+
+colnames(mm)[5:7]=c('med', 'sum', 'n')
+
+library('Hmisc')
+mm=cbind(mm, binconf(x=mm$sum, n=mm$n)[,2:3])
+
+library(ggplot2)
+ggplot(data=mm, aes(x=med, y=FBOcc, color=ShoreDist)) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  geom_point() +
+  xlab('Julien Day') +
+  ylab('Detection Probability') +
+  ggtitle('BND Occupancy')
+
+rm(mm)
+
+
+
+  # 5)  Visualise the daily autocorrelation for all units ################################################################################
+
+
+  
+  
+  acf_val=data.frame(UnitLoc=factor(),
+                     lag=numeric(),
+                     acf_score=numeric,
+                     GroupId=factor(),
+                     Shoredist=numeric())
+
+  for(ii in 1:30){
+    #idx=which(data_detections$UnitLoc==unique(data_detections$UnitLoc)[ii])
+    #data_detections$DiffDays[idx]=c(0,data_detections$JulienDay[idx[2:length(idx)]]-data_detections$JulienDay[idx[1:(length(idx)-1)]])
+    
+      mm=acf(OccTable_daily$FBTotOffset[OccTable_daily$UnitLoc== levels(OccTable$UnitLoc)[ii]], plot = F)
+    
+      acf_val=rbind(acf_val, data.frame(acf_score=mm$acf,
+                                      lag=mm$lag,
+                                      GroupId= strsplit(levels(OccTable$UnitLoc)[ii], split = '_')[[1]][1],
+                                      ShoreDist= strsplit(levels(OccTable$UnitLoc)[ii], split = '_')[[1]][2],
+                                      UnitLoc=levels(OccTable$UnitLoc)[ii]))
+    
+    
+    rm(mm)
+  }
+
+
+# Interleaved histograms
+
+acf_val$jlag=jitter(acf_val$lag)
+
+ggplot(acf_val, aes(x=lag, y=acf_score)) +
+  facet_wrap(~GroupId) +
+  geom_segment(aes(x = jlag, y = 0, xend = jlag, yend = acf_score, color=ShoreDist)) +
+  scale_color_manual(name="Shore Distance",
+                     breaks=levels(OccTable$ShoreDist),
+                     labels=c("Near", "Mid", "Off"),
+                     values=cbbPalette) +
+  geom_hline(yintercept = c(0.1, -.1), lty=2, color='red') +
+  theme_bw() +
+  xlab('Number of Days')+
+  ylab('ACF')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  #  X) Fit models to each deployment gorups, as before  #######################################
+  
+  # list to store the models #
+  modlist_FB=list()
+
+  
+  ModelTable_FB=data.frame(GroupId=levels(OccTable_daily_wDetections$GroupId))
+  ModelTable_FB$Data2013=0
+  ModelTable_FB$Data2014=0
+  ModelTable_FB$Data2015=0
+  ModelTable_FB$Nunits2013=0
+  ModelTable_FB$Nunits2014=0
+  ModelTable_FB$Nunits2015=0
+  ModelTable_FB$DeltaQIC=0
+  
+  par(ask=F)
+  # Build Models for 10 Variables
+  for(ii in 1:10){
+    
+    
+    data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+    data_sub$ShoreDist=factor(data_sub$ShoreDist, levels=c('05', '10', '15'))
+    data_sub <- droplevels(data_sub)
+    
+    
+    ModelTable_FB$Nunits2013[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2013]))
+    ModelTable_FB$Nunits2014[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2014]))
+    ModelTable_FB$Nunits2015[ii]=length(unique(data_sub$UnitLoc[data_sub$Year==2015]))
+    
+    newdat=subset(data_sub, select=c('JulienDay', 'ShoreDist', 'GroupId', 'UnitLoc', 'OccAll', 'Year','FBTotOffset'))
+    
+    tryCatch({
+      ModelTable$Data2013[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2013])))}, error=function(e){})
+    
+    tryCatch({
+      ModelTable$Data2014[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2014])))}, error=function(e){})
+    
+    
+    tryCatch({
+      ModelTable$Data2015[ii]<-as.character(Reduce(paste, unique(data_sub$UnitLoc[data_sub$Year==2015])))}, error=function(e){})
+    
+    
+    # Determine whether linear model or spline for Julien Day #
+    
+    modformula=list()
+    modformula[[1]]=as.formula(FBTotOffset~Year+ShoreDist*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[2]]=as.formula(FBTotOffset~ShoreDist+Year*bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[3]]=as.formula(FBTotOffset~ShoreDist+Year+bs(JulienDay, knots = mean(JulienDay)))
+    modformula[[4]]=as.formula(FBTotOffset~ShoreDist+Year+JulienDay)
+    
+    QIC_val=c(Inf,Inf,Inf)
+    print(ii)
+    for(jj in 1:4){
+      mod=try(geeglm(modformula[[jj]], 
+                     family = binomial, 
+                     data   = data_sub,
+                     weights = rep(1, nrow(data_sub)),
+                     id     = UnitLoc,
+                     corstr = 'ar1'), silent = T)
+      
+      
+      
+      if (class(mod) == "try-error"){QIC_val[jj]=Inf} else {
+        temp=withWarnings(geeglm(modformula[[jj]], 
+                                 family = binomial, 
+                                 data   = data_sub,
+                                 weights = rep(1, nrow(data_sub)),
+                                 id     = UnitLoc,
+                                 corstr = 'ar1'))
+        
+        if(length(temp$Warnings)<2){QIC_val[jj]=QIC(temp$Value)}
+        
+      }
+      print(jj)
+    }
+    
+    finalmodel=geeglm(modformula[[which.min(QIC_val)]], 
+                      family = binomial, 
+                      data   = data_sub,
+                      weights = rep(1, nrow(data_sub)),
+                      id     = UnitLoc,
+                      corstr = 'ar1')
+    
+    
+    ModelTable_FB$DeltaQIC[ii]=sort(QIC_val)[2]-sort(QIC_val)[1]
+    
+    
+    
+    # Document the formula
+    ModelTable_FB$ModelFormula[ii]=Reduce(paste, deparse(formula(finalmodel)))
+    
+    
+    
+    terms_orig=attr(finalmodel$terms,"term.labels")
+    terms_idx= grep('JulienDay', terms_orig)
+    terms=terms_orig
+    
+    
+    # Expand terms
+    
+    if(length(grep('JulienDay', terms_orig))>0){jday=seq(min(newdat$JulienDay), max(newdat$JulienDay))
+    }else{
+      jday=median(newdat$JulienDay)}
+    
+    if(length(grep('Year', terms_orig))>0){Year=data_sub$Year[1]}else{
+      Year=unique(data_sub$Year)}
+    
+    if(length(grep('ShoreDist', terms_orig))>0){ShoreDist=data_sub$ShoreDist[1]}else{
+      ShoreDist=unique(data_sub$ShoreDist)}
+    
+    
+    # Keep the final model 
+    modlist_FB[[ii]]=finalmodel
+    
+    
+    # Report AUC values
+    AUCvals=CalcAUC(finalmodel, data_sub = data_sub)
+    ModelTable_FB$AUC[ii]=round(AUCvals[1],2)
+    ModelTable_FB$Pres[ii]=round(AUCvals[2],2)
+    ModelTable_FB$Abs[ii]=round(AUCvals[3],2)  
+    
+    
+    # Make Predictions
+    if(ii==1){
+      fit_fb=cbind(newdat,  predictvcv(finalmodel))
+      
+    }else {
+      fit_fb=rbind(fit_fb, cbind(newdat, predictvcv(finalmodel)) )
+    }
+  }  
+
+
+# Look at model performance at all 30 locations
+Modperformance_fb=data.frame(GroupId=character(length = length(unique(OccTable_daily_wDetections$UnitLoc))),
+                          UnitLoc=character(length = length(unique(OccTable_daily_wDetections$UnitLoc))),
+                          AUC_unit=numeric(length = length(unique(OccTable_daily_wDetections$UnitLoc))),
+                          Pres_unit=numeric(length = length(unique(OccTable_daily_wDetections$UnitLoc))),
+                          Abs_unit=numeric(length = length(unique(OccTable_daily_wDetections$UnitLoc))))
+
+levels(Modperformance_fb$GroupId)= levels(OccTable_daily_wDetections$GroupId)
+levels(Modperformance_fb$UnitLoc)= levels(OccTable_daily_wDetections$UnitLoc)
+
+count=1
+for(ii in 1:10){
+  
+  data_sub=subset(OccTable_daily_wDetections, GroupId==unique(OccTable$GroupId)[ii])
+  
+  n=length(unique(data_sub$UnitLoc))
+  for(jj in 1:n){
+    
+    
+    subsub=subset(data_sub, UnitLoc==unique(data_sub$UnitLoc)[jj])
+    mm=CalcAUC(modlist_FB[[ii]], data_sub = subsub)
+    Modperformance_fb$AUC_unit[count]=mm[1]
+    Modperformance_fb$Pres_unit[count]=mm[2]
+    Modperformance_fb$Abs_unit[count]=mm[3]
+    
+    Modperformance_fb$GroupId[count]=subsub$GroupId[1]
+    Modperformance_fb$UnitLoc[count]=subsub$UnitLoc[1]
+    count=count+1
+  }
+  rm(subsub, mm)
+}    
+
+
+MM=merge(ModelTable_FB, Modperformance_fb, by='GroupId', all.x = TRUE)
+
+
+
+
+level_names=c( "Lat_05", "Lat_10", "Lat_15",
+               "Hel_05", "Hel_10", "Hel_15",
+               "Cro_05", "Cro_10", "Cro_15",
+               "SpB_05", "SpB_10", "SpB_15",
+               "Fra_05", "Fra_10", "Fra_15",
+               "Cru_05", "Cru_10", "Cru_15",
+               "Sto_05", "Sto_10", "Sto_15",
+               "Abr_05", "Abr_10", "Abr_15",
+               "StA_05", "StA_10", "StA_15",
+               "Stb_05", "Stb_10", "Stb_15")
+
+
+
+MM$UnitLoc=factor(MM$UnitLoc, levels=level_names)
+MM=with(MM, MM[order(UnitLoc),])
+MM=MM[! duplicated(MM),]
+
+
+# X)  Create coefficents table ###
+
+
+
+mod=modlist_FB[[1]]
+coeffvals=t(data.frame(coefficients(mod)))
+
+for(ii in 2:10){
+  mod=modlist_FB[[ii]]
+  NewVals=data.frame(coefficients(mod))
+  
+  coeffvals=merge(coeffvals, t(NewVals), all=TRUE)
+  
+  rm(NewVals)
+}
+
+# Make the order something sensable 
+coeffvals=coeffvals[,c(1,5,3,4,2,seq(6,ncol(coeffvals)))]
+
+# Add group id
+coeffvals$GroupId=levels(OccTable$GroupId)
+coeffvals=coeffvals[, c(ncol(coeffvals),seq(2,(ncol(coeffvals)-1)))]
+
+
+
+
+
+
+  # Xx) Plot models and fits for each location ####
+
+
+
+  # Three years one plot
+  ggplot(data=OccTable_daily_wDetections) +
+    theme_bw() +
+    facet_wrap(~GroupId) +
+    scale_colour_manual(values=cbbPalette[4:6]) +
+    geom_point(aes(x=JulienDay, y=FBTotOffset, color=ShoreDist), size=.0005) +
+    geom_line(data=subset(fit_fb, Year==2013), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+    geom_line(data=subset(fit_fb, Year==2014), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+    geom_line(data=subset(fit_fb, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+    geom_ribbon(data=fit_fb,aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+                alpha=.3,linetype= 'blank') +
+    ggtitle('Daily Occupancy ' ) +
+    ylab('P(FB)')+
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+
+# Only 5km Units
+ggplot(data=OccTable_daily_wDetections) +
+  theme_bw() +
+  facet_wrap(~GroupId, drop = FALSE) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(data=subset(OccTable_daily_wDetections, ShoreDist=='05'),
+             aes(x=JulienDay, y=BNDTotOffset, color=Year), size=.0005) +
+  geom_line(data=fit_fb[fit_fb$ShoreDist=='05',],
+            aes(JulienDay, inv.logit(fit), color=Year)) +
+  geom_ribbon(data=fit_fb[fit_fb$ShoreDist=='05',],
+              aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=Year),
+              alpha=.3,linetype= 'blank') +
+  scale_x_continuous(breaks = pretty(x = fit_fb$JulienDay, n = 3)) +
+  ggtitle('Daily Occupancy 05 Sites' )+
+  ylab('P(FB)')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+# Only 10km Units
+ggplot(OccTable_daily_wDetections) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(data=subset(OccTable_daily_wDetections, ShoreDist=='10'),
+             aes(x=JulienDay, y=BNDTotOffset, color=Year), size=.0005) +
+  geom_line(data=fit_fb[fit_fb$ShoreDist=='10',],
+            aes(JulienDay, inv.logit(fit), color=Year)) +
+  geom_ribbon(data=fit_fb[fit_fb$ShoreDist=='10',],
+              aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=Year),
+              alpha=.3,linetype= 'blank') +
+  scale_x_continuous(breaks = pretty(x = fit_fb$JulienDay, n = 3)) +
+  ggtitle('Daily Occupancy 10 Sites' ) +
+  
+  ylab('P(fb)')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+# Only 15km Units
+ggplot(OccTable_daily_wDetections) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(data=subset(OccTable_daily_wDetections, ShoreDist=='15'),
+             aes(x=JulienDay, y=BNDTotOffset, color=Year), size=.0005) +
+  geom_line(data=fit[fit$ShoreDist=='15',],
+            aes(JulienDay, inv.logit(fit), color=Year)) +
+  geom_ribbon(data=fit[fit$ShoreDist=='15',],
+              aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=Year),
+              alpha=.3,linetype= 'blank') +
+  scale_x_continuous(breaks = pretty(x = fit$JulienDay, n = 3)) +
+  ggtitle('Daily Occupancy 15 Sites' ) +
+  ylab('P(BND)')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+
+
+# Only 2013
+png(filename = paste('2013 Occupancy.png'),
+    units="in", 
+    width=7, 
+    height=9, 
+    pointsize=12,res = 400)
+
+ggplot(data=subset(OccTable_daily_wDetections, Year==2013)) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(aes(x=JulienDay, y=BNDTotOffset, color=ShoreDist), size=.0005) +
+  geom_line(data=subset(fit, Year==2013), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+  geom_ribbon(data=subset(fit, Year==2013),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('Daily Occupancy Rates 2013' )+
+  ylab('P(BND)')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+
+png(filename = paste('2014 Occupancy.png'),
+    units="in", 
+    width=7, 
+    height=9, 
+    pointsize=12,res = 400)
+
+ggplot(data=subset(OccTable_daily_wDetections, Year==2014)) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(aes(x=JulienDay, y=BNDTotOffset, color=ShoreDist), size=.0005) +
+  geom_line(data=subset(fit, Year==2014), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+  geom_ribbon(data=subset(fit, Year==2014),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('Daily Occupancy Rates 2014')+
+  ylab('P(BND)')+
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+
+png(filename = paste('2015 Occupancy.png'),
+    units="in", 
+    width=7, 
+    height=9, 
+    pointsize=12,res = 400)
+ggplot(data=subset(OccTable_daily_wDetections, Year==2015)) +
+  theme_bw() +
+  facet_wrap(~GroupId) +
+  scale_colour_manual(values=cbbPalette) +
+  geom_point(aes(x=JulienDay, y=BNDTotOffset, color=ShoreDist), size=.0005) +
+  geom_line(data=subset(fit, Year==2015), aes(JulienDay, inv.logit(fit), colour=ShoreDist)) +
+  geom_ribbon(data=subset(fit, Year==2015),aes(x=JulienDay, ymin=inv.logit(lwr), ymax=inv.logit(upr), color=ShoreDist),
+              alpha=.3,linetype= 'blank') +
+  ggtitle('Daily Occupancy Rates 2015')+
+  ylab('P(BND)') +
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+
+
+
+
+
+
+
+#######################################################
+  
+  # Old Material
+  
+#######################################################
+  
 # Xi) Make partial plots for all groups as before ###########
   
   
