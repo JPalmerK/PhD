@@ -1,0 +1,39 @@
+
+
+model{
+  
+  for(ii in 1:N){
+    
+    
+    y[ii] ~ dbern(eff.p[ii])
+    
+    # effective detection probability
+    eff.p[ii]<-det.prob[ii]*occ.p[ii]
+    
+    # Deteciotn Probability
+    det.prob_temp[ii] ~ dnorm(MedianRange1_scaled[ii], 1/0.0225)
+    logit(det.prob[ii]) <- det.prob_temp[ii]
+    
+    # True Occupancy
+    logit(occ.p[ii]) <- intercept + alpha.occ[Site[ii]]
+    
+  }
+  
+  ####  priors
+  # Set Alpha1 to 0
+   alpha.occ[1]<-0
+    # Estimate the fixed effect of site location 
+    for(ii in 2:NSites){
+          alpha.occ[ii] ~ dnorm(0, 10^-6)
+  	}
+ 
+  intercept ~ dnorm(0, 10^-6)
+  
+  
+  #data# N, y, NSites, Site, MedianRange1_scaled
+  # What we want to monitor:
+  #monitor# alpha.occ, intercept, dic
+  #inits# alpha.occ, intercept
+  
+  
+}

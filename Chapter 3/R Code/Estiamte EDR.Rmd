@@ -1,0 +1,18 @@
+---
+title: "EDR"
+output: word_document
+---
+
+This code estimates the Effective Detection Radius (EDR) for a C-POD under ideal situations. Here I assume that the maximum detection radius for a C-POD is 1km (www.chelonia.co.uk). First we start with a normal distirbution of 2000 animals (or acoustic sources) around a given sensor.
+
+
+```{r, results="hide",echo=FALSE}
+# Try it again with a maximum detection radius twice what it was before
+r=rbeta(2000, 2,1)*2
+
+# check
+hist(r, main = 'Uniform Distribution of Acoustic Sources', xlab = 'Distance (km)',
+     ylab='Detection Probability')
+
+```
+
