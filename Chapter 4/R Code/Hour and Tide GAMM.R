@@ -609,7 +609,8 @@ PredDat_cro$LCI=inv.logit(CroFit$fit-(1.96*CroFit$se.fit))
 
 # FUUUUUUUUUUUUUUZE them. Yes, that's an Invader Zim reference.
 
-
+levels(PredDat_nocro$GroupId) <- c('Latheron','Helmsdale', 'Cromarty', 'Spey Bay','Fraserburgh', 'Cruden Bay', 'Stonehaven','Arbroath', 'St Andrews', 'St Abbs')
+levels(PredDat_cro$GroupId) <- c('Latheron','Helmsdale', 'Cromarty', 'Spey Bay','Fraserburgh', 'Cruden Bay', 'Stonehaven','Arbroath', 'St Andrews', 'St Abbs')
 
 
 # Create figure of predictions and data
@@ -619,17 +620,19 @@ png(filename = paste('HourlyDet.png'),
     height=9,
     pointsize=12,res = 400)
 
-ggplot(PredDat_nocro) +
+ggplot(data = PredDat_nocro) +
   facet_wrap(~GroupId) +
-  geom_point(aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist), size=.5)+
+  geom_point(aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist, shape = ShoreDist), size= 1.7)+
+  scale_shape_manual(values=c(16, 17, 18))+
   geom_line(aes(HourAfterPeakSolEle, fit)) +
-  geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.3,linetype= 'blank') +
-  geom_point(data=PredDat_cro,aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist), size=.5)+
+  geom_ribbon(aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI), alpha=.3,linetype= 'blank') +
+  geom_point(data=PredDat_cro,aes(HourAfterPeakSolEle, BNDTotOffset, col=ShoreDist, shape=ShoreDist), size= 1.7)+
+  scale_shape_manual(values=c(16, 17, 18))+
   geom_line(data=PredDat_cro,aes(HourAfterPeakSolEle, fit)) +
   geom_ribbon(data=PredDat_cro,aes(x=HourAfterPeakSolEle, ymin=LCI, ymax=UCI),alpha=.3,linetype= 'blank')+
   theme_bw() +
-  ylim(c(0,.2)) +
-  scale_colour_manual(values=cbbPalette) +
+  ylim(c(0,.23)) +
+  scale_colour_grey(start = 0.1, end = 0.7)+
   ggtitle('Hourly Detection Rate') + 
   xlab('Hour Relative to Solar Noon') +
   ylab('Broadband Clcik Train Encounter Rate') +
@@ -665,7 +668,7 @@ p1<-ggplot(data=Cro_Model_data, aes(HourAfterPeakSolEle, HourAfterHigh))+
   ggtitle('Model Fit') +
   geom_tile(aes(fill = fit)) +
   #scale_fill_distiller(palette = "Spectral") +
-  scale_fill_viridis(option ='inferno') +
+  scale_fill_viridis(option ='inferno', begin = 0, 1) +
   ylab('Hour Relative to Hight Tide') +
   xlab('') +
   geom_point(data=subset(OccTable_DPD_cro,BNDTotOffset>0) ,
